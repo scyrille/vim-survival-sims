@@ -23,6 +23,12 @@ html-math-method: mathml
 library(tidyverse)
 library(MASS)
 library(knitr)
+library(survival)
+library(timereg)
+library(survML)
+library(SuperLearner)
+library(randomForestSRC)
+library(survex)
 
 rprojroot <- rprojroot::find_rstudio_root_file()
 source(file.path(rprojroot, "R/utils.R"))
@@ -30,4 +36,271 @@ source(file.path(rprojroot, "R/generate_data.R"))
 source(file.path(rprojroot, "R/pred_generators.R"))
 ```
 
+We generate data using additive hazards. 
+
+```{r}
+# Set seed for reproducibility 
+set.seed(2026)
+
+# Sample size 
+n <- 1000
+
+# Generate covariates
+p <- 3
+Sigma <- matrix(c(1, 0, 0,
+                  0, 1, 0,
+                  0, 0, 1), 
+                3, 3)
+X <- simulate_rna_pathways(n, p, mu = 0, Sigma)
+
+# Simulate time to event data  
+beta <- c(0, 0.02, 0.04)  
+lambda0 <- 0.07
+cens_rate <- 0.05
+lambda_i <- lambda0 + drop(as.matrix(X) %*% beta)
+lambda_i <- pmax(lambda_i, 1e-8)
+T <- rexp(n, rate = lambda_i)
+C <- rexp(n, rate = cens_rate)
+time <- pmin(T, C)
+event <- as.integer(T <= C)
+data <- data.frame(time, event, X)
+```
+
+
+## Exclusion variable importance
+
+We generate cross-fitting and sample-splitting folds.
+
+```{r}
+folds <- survML::generate_folds(n, V = 5, sample_split = TRUE)
+table(folds$cf_folds)
+table(folds$ss_folds)
+```
+
+We define time horizons, maximum follow-up time and times at which to approximate integrals.
+
+```{r}
+landmark_times <- quantile(time, c(0.25, 0.75))
+restriction_time <- max(time[event == 1])
+approx_times <- sort(unique(c(stats::quantile(time[event == 1 & time <= max(landmark_times)],
+                                                    probs = seq(0, 1, by = 0.01)),
+                                    landmark_times)))
+length(approx_times)
+```
+
+### Aalen model 
+
+We estimate the conditional survival functions, $F_0(t|X)$ and $G_0(t|X)$, using an additive Aalen model.
+
+```{r}
+conditional_surv_preds <- do.call(crossfit_surv_preds,
+                                  c(list(time = time,
+                                         event = event,
+                                         X = X,
+                                         folds = folds$cf_folds,
+                                         newtimes = approx_times, 
+                                         pred_generator = conditional_surv_aalen)))
+names(conditional_surv_preds)
+dim(conditional_surv_preds$S_hat[[1]])
+dim(conditional_surv_preds$S_hat[[2]])
+dim(conditional_surv_preds$S_hat_train[[1]])
+```
+
+Then, we estimate the full oracle prediction function, $f_{0}$, using Super Learner. 
+
+```{r}
+SL.library <- c("SL.mean","SL.glm")
+V <- 2
+large_oracle_generator_control <- list(indx = integer(0),
+                                       outcome = "survival_probability",
+                                       nuisance_preds = conditional_surv_preds,
+                                       landmark_times = landmark_times,
+                                       approx_times = approx_times, 
+                                       restriction_time = restriction_time,
+                                       SL.library = SL.library,
+                                       V = V)
+large_oracle_preds <- do.call(crossfit_oracle_preds,
+                                  c(list(time = time,
+                                         event = event,
+                                         X = X,
+                                         folds = folds$cf_folds,
+                                         pred_generator = generate_oracle_predictions_DR),
+                                    large_oracle_generator_control))
+names(large_oracle_preds)
+dim(large_oracle_preds$f_hat[[1]])
+dim(large_oracle_preds$f_hat[[2]])
+dim(large_oracle_preds$f_hat_train[[1]])
+```
+
+We finally compute variable importance estimates using Super Learner to estimate the residual oracle prediction $f_{0,s}$. 
+
+```{r}
+survML_aalen_auc <- list()
+for (i in 1:ncol(X)){
+  survML_aalen_auc[[i]] <-  vim(type = "AUC",
+                                time = time,
+                                event = event,
+                                X = X,
+                                landmark_times = landmark_times,
+                                approx_times = approx_times, 
+                                large_feature_vector = 1:ncol(X),
+                                small_feature_vector = 1:ncol(X) %>% subset(.!=i),
+                                conditional_surv_preds = conditional_surv_preds,
+                                large_oracle_preds = large_oracle_preds,
+                                small_oracle_generator_control = list(SL.library = SL.library,
+                                                                      V = V),
+                                cf_folds = folds$cf_folds,
+                                ss_folds = folds$ss_folds, 
+                                scale_est = TRUE)
+}
+survML_aalen_auc %>%
+  map(~.x$result)%>%
+  bind_rows()%>%
+  kable()
+```
+
+### Global survival stacking  
+
+We estimate the conditional survival functions, $F_0(t|X)$ and $G_0(t|X)$, using global survival stacking.
+
+```{r}
+bin_size <- 0.5
+conditional_surv_generator_control <- list(SL.library = SL.library,
+                                           V = V,
+                                           bin_size = bin_size,
+                                           approx_times = approx_times)
+conditional_surv_preds <- do.call(crossfit_surv_preds,
+                                  c(list(time = time,
+                                         event = event,
+                                         X = X,
+                                         folds = folds$cf_folds,
+                                         newtimes = approx_times, 
+                                         pred_generator = generate_nuisance_predictions_stackG), 
+                                    conditional_surv_generator_control))
+names(conditional_surv_preds)
+dim(conditional_surv_preds$S_hat[[1]])
+dim(conditional_surv_preds$S_hat[[2]])
+dim(conditional_surv_preds$S_hat_train[[1]])
+```
+
+Then, we estimate the full oracle prediction function, $f_{0}$, using Super Learner. 
+
+```{r}
+large_oracle_generator_control <- list(indx = integer(0),
+                                       outcome = "survival_probability",
+                                       nuisance_preds = conditional_surv_preds,
+                                       landmark_times = landmark_times,
+                                       approx_times = approx_times, 
+                                       restriction_time = restriction_time,
+                                       SL.library = SL.library,
+                                       V = V)
+large_oracle_preds <- do.call(crossfit_oracle_preds,
+                              c(list(time = time,
+                                     event = event,
+                                     X = X,
+                                     folds = folds$cf_folds,
+                                     pred_generator = generate_oracle_predictions_DR),
+                                large_oracle_generator_control))
+names(large_oracle_preds)
+dim(large_oracle_preds$f_hat[[1]])
+dim(large_oracle_preds$f_hat[[2]])
+dim(large_oracle_preds$f_hat_train[[1]])
+```
+
+We finally compute variable importance estimates using Super Learner to estimate the residual oracle prediction $f_{0,s}$. 
+
+```{r}
+survML_stackG_auc <- list()
+for (i in 1:ncol(X)){
+  survML_stackG_auc[[i]] <- vim(type = "AUC",
+                                time = time,
+                                event = event,
+                                X = X,
+                                landmark_times = landmark_times,
+                                approx_times = approx_times, 
+                                large_feature_vector = 1:ncol(X),
+                                small_feature_vector = 1:ncol(X) %>% subset(.!=i),
+                                conditional_surv_preds = conditional_surv_preds,
+                                large_oracle_preds = large_oracle_preds,
+                                small_oracle_generator_control = list(SL.library = SL.library,
+                                                                      V = V),
+                                cf_folds = folds$cf_folds,
+                                ss_folds = folds$ss_folds, 
+                                scale_est = TRUE)
+}
+survML_stackG_auc %>%
+  map(~.x$result)%>%
+  bind_rows()%>%
+  kable()
+```
+
+## Permutation variable importance 
+
+### Aalen model
+
+```{r}
+# Fit the Aalen model
+aalen_fit <- timereg::aalen(Surv(time, event)~const(R1)+R2+R3, data = data,
+                            resample.iid = 1)
+
+# Model performance 
+aalen_exp <- survex::explain(aalen_fit, data = data[,c("R1","R2","R3")],
+                             y = Surv(data$time, data$event), label = "aalen")
+aalen_perf <- model_performance(aalen_exp, metrics = c(`C/D AUC` = cd_auc, `Brier score` = brier_score))
+plot(aalen_perf)
+
+times <- quantile(data$time, c(0.25, 0.75))
+aalen_perf_times <- model_performance(aalen_exp, metrics = c(`C/D AUC` = cd_auc, `Brier score` = brier_score), times = times)
+aalen_perf_times$result
+
+# Variable importance
+permut_aalen_brier <- model_parts(
+  aalen_exp, B = 10, type = "difference",
+  loss_function = survex::loss_brier_score
+  )
+plot(permut_aalen_brier)
+# model_parts(
+#   aalen_exp, B = 10, type = "difference",
+#   loss_function = survex::loss_brier_score,
+#   times = times
+#   )
+permut_aalen_auc <- model_parts(
+  aalen_exp, B = 10, type = "difference",
+  loss_function = survex::loss_one_minus_cd_auc
+  )
+plot(permut_aalen_auc)
+# model_parts(
+#   aalen_exp, B = 10, type = "difference",
+#   loss_function = survex::loss_one_minus_cd_auc,
+#   times = times 
+#   )
+```
+
+### Random survival forests
+
+```{r}
+# Fit random survival forests
+rfsrc_fit <- randomForestSRC::rfsrc(Surv(time, event)~., data, 
+                                    importance = "none",
+                                    splitrule = "logrank",
+                                    seed = 2024)
+
+# Model performance 
+rfsrc_exp <- survex::explain(rfsrc_fit, data = data[,c("R1","R2","R3")],
+                             y = Surv(data$time, data$event))
+rfsrc_perf <- model_performance(rfsrc_exp, metrics = c(`C/D AUC` = cd_auc, `Brier score` = brier_score))
+plot(rfsrc_perf)
+
+times <- quantile(data$time, c(0.25, 0.75))
+rfsrc_perf_times <- model_performance(rfsrc_exp, metrics = c(`C/D AUC` = cd_auc, `Brier score` = brier_score), times = times)
+rfsrc_perf_times$result
+
+# Variable importance 
+permut_rfsrc_brier <- model_parts(rfsrc_exp, B = 10, type = "difference",
+                                  loss_function = survex::loss_brier_score)
+plot(permut_rfsrc_brier) 
+permut_rfsrc_auc <- model_parts(rfsrc_exp, B = 10, type = "difference",
+                                loss_function = survex::loss_one_minus_cd_auc)
+plot(permut_rfsrc_auc)
+```
 

@@ -1,6 +1,6 @@
 # Model-agnostic variable importance for survival outcomes: a simulation study under additive and mixed hazards
 
-## Introduction 
+## Introduction
 
 We conducted a simulation study to examine the behavior of Wolock’s model-agnostic exclusion variable importance measure (VIM) under a range of survival data-generating mechanisms. The objectives were to evaluate its performance and inferential validity under additive hazards, mixed additive–multiplicative hazards, and proportional hazards settings, including high-dimensional scenarios with rare binary covariates and heterogeneous effect sizes. We also compared alternative strategies for nuisance function estimation and contrasted exclusion-based importance with permutation-based importance across all scenarios.
 

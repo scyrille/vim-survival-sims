@@ -1,0 +1,33 @@
+---
+title: "Tests for variable importance estimation"
+author: "Stacy Cyrille"
+date: last-modified
+format: 
+  html:
+    keep-md: false
+    toc: true
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+execute: 
+  # echo: false
+  message: false
+  warning: false
+fig-width: 8
+fig-align: "center"
+fig-cap-location: top
+html-math-method: mathml
+---
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(knitr)
+
+rprojroot <- rprojroot::find_rstudio_root_file()
+source(file.path(rprojroot, "R/utils.R"))
+source(file.path(rprojroot, "R/generate_data.R"))
+source(file.path(rprojroot, "R/pred_generators.R"))
+```
+
+

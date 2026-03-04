@@ -23,6 +23,8 @@ html-math-method: mathml
 library(tidyverse)
 library(MASS)
 library(knitr)
+library(survival)
+library(timereg)
 
 rprojroot <- rprojroot::find_rstudio_root_file()
 source(file.path(rprojroot, "R/utils.R"))
@@ -175,3 +177,261 @@ ggplot(mat_long, aes(Var1, Var2, fill = Freq)) +
   labs(fill = "Raw p-value", x ="", y = "", 
        title = "Heatmap of raw p-values")
 ```
+
+## RNA pathways 
+
+**Example 1**
+
+We generate a simple example. 
+
+* Sample size: $n = 1000$
+* Number of RNA pathways: $p_R = 3$
+* Correlation matrix: 
+
+$$\Sigma_R = \left(
+\begin{array}{ccc}
+\text{1} & \text{0} & \text{0.2} \\
+\text{0} & \text{1} & \text{0.5} \\
+\text{0.2} & \text{0.5} & \text{1}
+\end{array}
+\right)$$
+
+```{r}
+set.seed(2026)
+p <- 3 
+mu <- 0
+Sigma <- matrix(c(1,   0,   0.2,
+                  0,   1,   -0.5,
+                  0.2, -0.5, 1), 
+                3, 3)
+# Inspect the matrix 
+colnames(Sigma) <- paste0("R",1:p)
+rownames(Sigma) <- paste0("R",1:p)
+Sigma %>% 
+  as.data.frame()%>%
+    tibble::rownames_to_column("var1")%>%
+    pivot_longer(-var1, names_to = "var2")%>%
+    mutate(value = ifelse(var1==var2, NA, value),
+           var1 = factor(var1, levels = paste0("R",1:p)),
+           var2 = factor(var2, levels = paste0("R",1:p)))%>%
+    {
+      ggplot(., aes(var1, var2, fill = value)) +
+        geom_tile() +
+        scale_fill_distiller(palette = "RdBu", direction = -1, 
+                             limits = c(-1,1)) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        labs(fill = "Correlation coefficient", x ="", y = "", 
+             title = "True correlation matrix in the simulation design")
+    }
+
+rna1 <- simulate_rna_pathways(n, p, mu, Sigma)
+
+# Check mean 
+colMeans(rna1)
+
+# Check variance
+apply(rna1, 2, var)
+
+# Correlation matrix
+as.data.frame(cor(rna1))%>%
+  tibble::rownames_to_column("var1")%>%
+  pivot_longer(-var1, names_to = "var2")%>%
+  mutate(value = ifelse(var1==var2, NA, value),
+         var1 = factor(var1, levels = paste0("R",1:20)),
+         var2 = factor(var2, levels = paste0("R",1:20)))%>%
+  {
+    ggplot(., aes(var1, var2, fill = value)) +
+      geom_tile() +
+      scale_fill_distiller(palette = "RdBu", direction = -1, 
+                           limits = c(-1,1)) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(fill = "Correlation coefficient", x ="", y = "", 
+           title = "Correlation matrix of simulated variables")
+  }
+```
+
+---
+
+**Example 2**
+
+We simulate correlated variables grouped into blocks.
+
+* Sample size: $n = 1000$
+* Number of RNA pathways $p_R = 20$
+* Block size: $b_R = 5$
+* Number of blocks: $K_R = 4$
+* Within-block correlations: $\rho_{R;k1} = 0.7, \quad \rho_{R;k2} = -0.2, \quad \rho_{R;k3} = 0.5, \quad \rho_{R;k4} = 0.1$
+* Between-block correlation: $\rho_{B_R} = 0.05$
+
+```{r}
+set.seed(2026)
+p = 20 
+
+# Initialize the matrix
+Sigma <- generate_block_corr(p, 
+                             block_size = 5, 
+                             rho_within = c(0.7, -0.2, 0.5, 0.1), 
+                             rho_between = 0.05)
+# Inspect the matrix 
+colnames(Sigma) <- paste0("R",1:20)
+rownames(Sigma) <- paste0("R",1:20)
+Sigma %>% 
+  as.data.frame()%>%
+    tibble::rownames_to_column("var1")%>%
+    pivot_longer(-var1, names_to = "var2")%>%
+    mutate(value = ifelse(var1==var2, NA, value),
+           var1 = factor(var1, levels = paste0("R",1:20)),
+           var2 = factor(var2, levels = paste0("R",1:20)))%>%
+    {
+      ggplot(., aes(var1, var2, fill = value)) +
+        geom_tile() +
+        scale_fill_distiller(palette = "RdBu", direction = -1, 
+                             limits = c(-1,1)) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        labs(fill = "Correlation coefficient", x ="", y = "", 
+             title = "True correlation matrix in the simulation design")
+    }
+
+# Simulate correlated data using this matrix 
+rna_block <- simulate_rna_pathways(n, p, mu, Sigma)
+
+# Check mean 
+colMeans(rna_block)
+
+# Check variance 
+apply(rna_block, 2, var)
+
+# Correlation matrix
+as.data.frame(cor(rna_block))%>%
+  tibble::rownames_to_column("var1")%>%
+  pivot_longer(-var1, names_to = "var2")%>%
+  mutate(value = ifelse(var1==var2, NA, value),
+         var1 = factor(var1, levels = paste0("R",1:20)),
+         var2 = factor(var2, levels = paste0("R",1:20)))%>%
+  {
+    ggplot(., aes(var1, var2, fill = value)) +
+      geom_tile() +
+      scale_fill_distiller(palette = "RdBu", direction = -1, 
+                           limits = c(-1,1)) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(fill = "Correlation coefficient", x ="", y = "", 
+           title = "Correlation matrix of simulated variables")
+  }
+```
+
+## Aalen model 
+
+```{r}
+# Set seed for reproducibility 
+set.seed(2026)
+
+# Sample size 
+n <- 1000
+
+# Generate covariates
+p <- 3
+Sigma <- matrix(c(1, 0, 0,
+                  0, 1, 0,
+                  0, 0, 1), 
+                3, 3)
+X <- as.matrix(simulate_rna_pathways(n, p, mu = 0, Sigma))
+
+# Generate time to event data
+beta <- c(0, 0.02, 0.06)  
+lambda0 <- 0.07
+lambda_i <- lambda0 + drop(X %*% beta)
+lambda_i <- pmax(lambda_i, 1e-8)
+T <- rexp(n, rate = lambda_i)
+cens_rate <- 0.05
+C <- rexp(n, rate = cens_rate)
+time <- pmin(T, C)
+event <- as.integer(T <= C)
+data <- data.frame(time, event, X)
+
+# Fit the Aalen model
+# All components of the model have nonparametric time-varying effects.
+aalen_fit <- timereg::aalen(Surv(time, event)~R1+R2+R3, 
+                            data = data)
+summary(aalen_fit)
+
+# Plot the non-parametric cumulative regression coefficients with 95% CI
+par(mfrow=c(1,4))
+plot(aalen_fit, ylim = c(-0.5,4))
+
+# Fit the model with the effect of R1 being constant
+aalen_fit2 <- timereg::aalen(Surv(time, event)~const(R1)+R2+R3, 
+                            data = data)
+summary(aalen_fit2)
+par(mfrow=c(1,3))
+plot(aalen_fit2, ylim = c(-0.5,4))
+```
+
+
+## Cox-Aalen model
+
+```{r}
+# Set seed for reproducibility 
+set.seed(2026)
+
+# Sample size 
+n <- 1000
+
+# Generate covariates
+p <- 2
+prev <- c(0.2, 0.5)
+Sigma <- matrix(c(1, 0,
+                  0, 1), 
+                p, p)
+X_D <- simulate_dna_pathways(n, prev, Sigma)
+X_R <- simulate_rna_pathways(n, p, mu = 0, Sigma)
+X <- cbind(X_D, X_R)
+
+# Generate time to event data
+beta_add <- c(0, 0.04)  
+beta_mult <- c(0.7, 0)
+lambda0 <- 0.05
+cens_rate <- 0.05
+hazard_i <- lambda0 * exp(drop(as.matrix(X_D) %*% beta_mult))+
+  drop(as.matrix(X_R) %*% beta_add)
+hazard_i <- pmax(hazard_i, 1e-6)
+T <- rexp(n, rate = hazard_i)
+C <- rexp(n, rate = cens_rate)
+time <- pmin(T, C)
+event <- as.integer(T<=C)
+data <- data.frame(time, event, X_D, X_R)
+
+# Fit Cox Aalen model
+cox_aalen_fit <- timereg::cox.aalen(
+  Surv(time, event)~prop(D1)+prop(D2)+R1+R2, 
+  data)
+summary(cox_aalen_fit)
+
+# Proportional excess terms of model 
+cox(cox_aalen_fit)
+par(mfrow=c(1,2))
+plot(cox_aalen_fit,score= TRUE) 
+
+# Plot additive Aalen terms
+par(mfrow = c(1,3))
+plot(cox_aalen_fit, ylim = c(-0.5,5))
+
+# Allow some additive terms to be time-constant 
+cox_aalen_fit2 <- timereg::cox.aalen(
+  Surv(time, event)~prop(D1)+prop(D2)+const(R1)+R2, 
+  data, robust = TRUE)
+summary(cox_aalen_fit2)
+
+# Proportional excess terms of model 
+cox(cox_aalen_fit2)
+par(mfrow=c(1,2))
+plot(cox_aalen_fit2,score= TRUE) 
+
+# Plot additive Aalen terms
+par(mfrow = c(1,3))
+plot(cox_aalen_fit2, ylim = c(-0.5, 5)) 
+```
+

@@ -33,7 +33,11 @@ $$
 \big)^\top,
 $$
 
-where $\mathbf{C}_i = (C_{i1}, \dots, C_{ip_C})$ denotes clinical covariates, $\mathbf{D}_i = (D_{i1}, \dots, D_{ip_D})$ denotes DNA variables and $\mathbf{R}_i = (R_{i1}, \dots, R_{ip_R})$ denotes RNA pathway scores.
+where 
+
+* $\mathbf{C}_i = (C_{i1}, \dots, C_{ip_C})$ denotes clinical covariates 
+* $\mathbf{D}_i = (D_{i1}, \dots, D_{ip_D})$ denotes DNA variables,
+* $\mathbf{R}_i = (R_{i1}, \dots, R_{ip_R})$ denotes RNA pathway scores.
 
 The total number of predictors was
 

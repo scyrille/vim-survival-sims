@@ -33,11 +33,7 @@ $$
 \big)^\top,
 $$
 
-where:
-
-- $\mathbf{C}_i = (C_{i1}, \dots, C_{ip_C})$ denotes clinical covariates,
-- $\mathbf{D}_i = (D_{i1}, \dots, D_{ip_D})$ denotes DNA variables,
-- $\mathbf{R}_i = (R_{i1}, \dots, R_{ip_R})$ denotes RNA pathway scores.
+where $\mathbf{C}_i = (C_{i1}, \dots, C_{ip_C})$ denotes clinical covariates, $\mathbf{D}_i = (D_{i1}, \dots, D_{ip_D})$ denotes DNA variables and $\mathbf{R}_i = (R_{i1}, \dots, R_{ip_R})$ denotes RNA pathway scores.
 
 The total number of predictors was
 
@@ -139,11 +135,7 @@ $$
 Equivalently, each diagonal block can be written as
 
 $$
-\Sigma_{R,k}
-=
-(1-\rho_k) I_b
-+
-\rho_k \mathbf{1}_b \mathbf{1}_b^\top,
+\Sigma_{R,k}=(1-\rho_k) I_b+\rho_k \mathbf{1}_b \mathbf{1}_b^\top,
 $$
 
 where $I_b$ denotes the $b \times b$ identity matrix and $\mathbf{1}_b$ is a $b$-dimensional vector of ones.
@@ -155,9 +147,7 @@ This structure induces strong positive co-regulation in block 1, moderate positi
 To reproduce GSVA outputs as used in practice, RNA scores were standardized across samples:
 
 $$
-\tilde{R}_{ik}
-=
-\frac{R_{ik} - \bar{R}_k}{s_k},
+\tilde{R}_{ik}=\frac{R_{ik} - \bar{R}_k}{s_k},
 $$
 
 where $\bar{R}_k$ and $s_k$ denote the sample mean and standard deviation of pathway $k$.
@@ -205,9 +195,9 @@ To ensure non-negativity of the hazard function, regression parameters
 were chosen such that
 
 $$
-\lambda_0(t) + \mathbf{X}_i^\top \boldsymbol{\beta} \ge 0
-\quad \text{for all } i.
+\lambda_0(t) + \mathbf{X}_i^\top \boldsymbol{\beta} \ge 0 \quad \text{for all } i.
 $$
+
 **Cox-Aalen model**
 
 To evaluate performance under mixed hazard structures, we additionally generated data from a Cox-Aalen model:
@@ -257,10 +247,7 @@ We used the sample splitting procedure to compute VIM point and standard error e
 Permutation VIM measures was calculated using `survex` package using the `model_parts()` function. The importance of $j$-th variable is defined as the change in the loss function $\mathcal{L}$ caused by permutation of this variable in the dataset:
 
 $$
-\mathrm{PFI}_t(f, \mathbf{X}, j, \mathcal{L}, y)
-= \frac{1}{B} \sum_{i=1}^{B}
-\left( \mathcal{L}(f, \mathbf{X}, y)
-- \mathcal{L}(f, \mathbf{X}^{*j}_i, y) \right)
+\mathrm{PFI}_t(f, \mathbf{X}, j, \mathcal{L}, y)= \frac{1}{B} \sum_{i=1}^{B}\left( \mathcal{L}(f, \mathbf{X}, y)- \mathcal{L}(f, \mathbf{X}^{*j}_i, y) \right)
 $$
 
 where $\mathcal{L}$ represents the loss function chosen to evaluate model performance, $\mathbf{X}^{*j}_i$ denotes the $i$-th permutation of variable $j$ within the dataset $X$, and $B$ is the number of different permutations. Permuting a variable is supposed to simulate the loss of information associated with the variable.
@@ -280,7 +267,7 @@ Variable importance was evaluated at a two fixed time horizons, corresponding to
 
 ### Performance metrics for variable importance in survival analysis 
 
-Variable importance was evaluated using the ***Brier score***, $BS(t)$ to captures both discrimination and calibration. We additionally used the ***cumulative/dynamic area under the ROC curve, ***$AUC(t)$ to estimate variable importance measures, which evaluate discrimination independently of calibration. 
+Variable importance was evaluated using the *Brier score*, $BS(t)$ to captures both discrimination and calibration. We additionally used the *cumulative/dynamic area under the ROC curve,* $AUC(t)$ to estimate variable importance measures, which evaluate discrimination independently of calibration. 
 
 The ***cumulative/dynamique AUC*** at time $t$ is defined as the probabilitu that, among a randomly selected pair consisting of one individual who experiences the event before $t$ and one who survives beyon $t$, the predicted risk is higher for the former. 
 
@@ -344,7 +331,7 @@ an ***additive hazards model***.
 The covariates are generated *independently* as follows:
 
 * $X = (X_{D_1}, X_{D_2}, X_{R_1}, X_{R_2})$
-* $X_{D_1}, X_{D_2} \sim \mathcal{Bernoulli}(0.4)$
+* $X_{D_1}, X_{D_2} \sim \mathcal{B}(0.4)$
 * $X_{R_1}, X_{R_2} \sim \mathcal{N}(0,1)$
 
 The event time follows an additive hazards model with constant effects: 
@@ -352,6 +339,7 @@ The event time follows an additive hazards model with constant effects:
 $$
 \beta_{D_{1}}=, \quad \beta_{D_{2}}=, \quad \beta_{R_{1}}=, \quad \beta_{R_{2}}=
 $$
+
 with constant baseline hazard: $\lambda_0(t)=0.1$. 
 
 Censoring times were generated independently to yield approximately 20-25%
@@ -382,7 +370,7 @@ This scenario evaluate the sensitivity of the exclusion VIM when the true hazard
 The covariates are generated *independently* as follows:
 
 * $X = (X_{D_1}, X_{D_2}, X_{R_1}, X_{R_2})$
-* $X_{D_1}, X_{D_2} \sim \mathcal{Bernoulli}(0.4)$
+* $X_{D_1}, X_{D_2} \sim \mathcal{B}(0.4)$
 * $X_{R_1}, X_{R_2} \sim \mathcal{N}(0,1)$
 
 The event time follows a Cox-Aalen model: 
@@ -390,11 +378,11 @@ The event time follows a Cox-Aalen model:
 $$
 \beta_{D_{1}}=, \quad \beta_{D_{2}}=, \quad \beta_{R_{1}}=, \quad \beta_{R_{2}}=
 $$
+
 with constant baseline hazard: $\lambda_0(t)=0.1$. 
 
 Censoring times were generated independently to yield approximately 20-25%
 right censoring.
-
 
 **Nuisance functions estimators to compare**
 
@@ -420,7 +408,7 @@ The goal is to assess whether VIM can:
 
 All covariates were generated independently as follows: 
 
-$$X_j \sim \mathcal{Bernoulli}(\pi_j)$$ with $\pi \in \{0.01, 0.1\}$ to reflect genomic rarity. 
+$$X_j \sim \mathcal{B}(\pi_j)$$ with $\pi \in \{0.01, 0.1\}$ to reflect genomic rarity. 
 
 The event times follows a Cox model with a with constant baseline hazard $\lambda_0(t) = 0.1$. We partional covariates into four groups: 
 
@@ -481,25 +469,22 @@ Golmakani’s approach builds a Super Learner for survival data by minimizing **
 
 *Predicting survival by a Super Learner* (`survivalSL`) 
 
-```{r echo = F}
-kable(tribble(
-  ~Name, ~Description,
-  "LIB_COXall",        "Proportional hazards (PH) model with all covariates (#)",
-  "LIB_COXaic",        "PH model with covariate selection by AIC minimization (#)",
-  "LIB_COXen",         "PH model with B-spline for quantitative covariates and Elastic-Net penalization (#; hyperparameters: alpha, lambda)",
-  "LIB_COXlasso",      "PH model with B-spline for quantitative covariates and Lasso penalization (#; hyperparameter: lambda)",
-  "LIB_COXridge",      "PH model with B-spline for quantitative covariates and Ridge penalization (#; hyperparameter: lambda)",
-  "LIB_AFTgamma",      "Accelerated failure time (AFT) model with Gamma distribution",
-  "LIB_AFTggamma",     "AFT model with generalized Gamma distribution",
-  "LIB_AFTllogis",     "AFT model with log-logistic distribution",
-  "LIB_AFTweibull",    "AFT model with Weibull distribution",
-  "LIB_PHexponential", "Parametric PH model with Exponential distribution",
-  "LIB_PHgompertz",    "Parametric PH model with Gompertz distribution",
-  "LIB_PHspline",      "PH model with natural cubic spline baseline (hyperparameter: k)",
-  "LIB_RSF",           "Random survival forest (hyperparameters: nodesize, mtry, ntree)",
-  "LIB_PLANN",         "One-layer survival neural network (hyperparameters: n.nodes, decay, batch.size, epochs)"
-))
-```
+| Name              | Description |
+|-------------------|-------------|
+| LIB_COXall        | Proportional hazards (PH) model with all covariates (#) |
+| LIB_COXaic        | PH model with covariate selection by AIC minimization (#) |
+| LIB_COXen         | PH model with B-spline for quantitative covariates and Elastic-Net penalization (#; hyperparameters: alpha, lambda) |
+| LIB_COXlasso      | PH model with B-spline for quantitative covariates and Lasso penalization (#; hyperparameter: lambda) |
+| LIB_COXridge      | PH model with B-spline for quantitative covariates and Ridge penalization (#; hyperparameter: lambda) |
+| LIB_AFTgamma      | Accelerated failure time (AFT) model with Gamma distribution |
+| LIB_AFTggamma     | AFT model with generalized Gamma distribution |
+| LIB_AFTllogis     | AFT model with log-logistic distribution |
+| LIB_AFTweibull    | AFT model with Weibull distribution |
+| LIB_PHexponential | Parametric PH model with Exponential distribution |
+| LIB_PHgompertz    | Parametric PH model with Gompertz distribution |
+| LIB_PHspline      | PH model with natural cubic spline baseline (hyperparameter: k) |
+| LIB_RSF           | Random survival forest (hyperparameters: nodesize, mtry, ntree) |
+| LIB_PLANN         | One-layer survival neural network (hyperparameters: n.nodes, decay, batch.size, epochs) |
 
 *Super Learning for conditional survival functions with right-censored data* (`survSuperLearner`)
 
@@ -509,31 +494,25 @@ library(survSuperLearner)
 survSuperLearner::survlistWrappers()
 ```
 
-```{r echo = F}
-kable(tribble(
-  ~Wrapper, ~Description,
-  "survSL.coxph",     "Cox proportional hazards model",
-  "survSL.expreg",    "Parametric exponential survival regression",
-  "survSL.gam",       "Generalized additive survival model",
-  "survSL.km",        "Kaplan–Meier estimator",
-  "survSL.loglogreg", "Log-logistic survival regression",
-  "survSL.pchreg",    "Piecewise constant hazards regression",
-  "survSL.pchSL",     "SuperLearner with piecewise constant hazards",
-  "survSL.rfsrc",     "Random survival forest (randomForestSRC)",
-  "survSL.template",  "Template for custom survival wrapper",
-  "survSL.weibreg",   "Weibull survival regression"
-))
-```
+| Wrapper            | Description |
+|--------------------|------------|
+| survSL.coxph       | Cox proportional hazards model |
+| survSL.expreg      | Parametric exponential survival regression |
+| survSL.gam         | Generalized additive survival model |
+| survSL.km          | Kaplan–Meier estimator |
+| survSL.loglogreg   | Log-logistic survival regression |
+| survSL.pchreg      | Piecewise constant hazards regression |
+| survSL.pchSL       | SuperLearner with piecewise constant hazards |
+| survSL.rfsrc       | Random survival forest (randomForestSRC) |
+| survSL.template    | Template for custom survival wrapper |
+| survSL.weibreg     | Weibull survival regression |
 
-```{r echo = F}
-kable(tribble(
-  ~Wrapper, ~Description,
-  "All",                    "No screening (all variables retained)",
-  "survscreen.glmnet",      "Screening via glmnet penalized regression",
-  "survscreen.marg",        "Marginal screening (univariate survival association)",
-  "survscreen.template",    "Template for custom survival screening"
-))
-```
+| Wrapper              | Description |
+|----------------------|------------|
+| All                  | No screening (all variables retained) |
+| survscreen.glmnet    | Screening via glmnet penalized regression |
+| survscreen.marg      | Marginal screening (univariate survival association) |
+| survscreen.template  | Template for custom survival screening |
 
 
 #### Global survival stacking 
@@ -544,65 +523,60 @@ library(SuperLearner)
 SuperLearner::listWrappers()
 ```
 
-```{r echo = F}
-kable(tribble(
-  ~Wrapper, ~Type,
-  "SL.bartMachine",     "Bayesian Additive Regression Trees (BART)",
-  "SL.bayesglm",        "Bayesian generalized linear model",
-  "SL.biglasso",        "Lasso / Elastic-Net (biglasso)",
-  "SL.caret",           "caret unified interface",
-  "SL.caret.rpart",     "caret interface for rpart",
-  "SL.cforest",         "Conditional inference forest",
-  "SL.earth",           "Multivariate Adaptive Regression Splines (MARS)",
-  "SL.gam",             "Generalized additive model",
-  "SL.gbm",             "Gradient boosting machine",
-  "SL.glm",             "Generalized linear model",
-  "SL.glm.interaction", "GLM with interaction terms",
-  "SL.glmnet",          "Elastic-Net regularized GLM",
-  "SL.ipredbagg",       "Bagged trees (ipred)",
-  "SL.kernelKnn",       "Kernel k-nearest neighbors",
-  "SL.knn",             "k-nearest neighbors",
-  "SL.ksvm",            "Kernel support vector machine",
-  "SL.lda",             "Linear discriminant analysis",
-  "SL.leekasso",        "Leekasso variable selection",
-  "SL.lm",              "Linear model",
-  "SL.loess",           "Local regression (LOESS)",
-  "SL.logreg",          "Logistic regression",
-  "SL.mean",            "Mean predictor",
-  "SL.nnet",            "Neural network",
-  "SL.nnls",            "Non-negative least squares",
-  "SL.polymars",        "Polynomial MARS",
-  "SL.qda",             "Quadratic discriminant analysis",
-  "SL.randomForest",    "Random forest",
-  "SL.ranger",          "Fast random forest (ranger)",
-  "SL.ridge",           "Ridge regression",
-  "SL.rpart",           "CART decision tree",
-  "SL.rpartPrune",      "Pruned CART tree",
-  "SL.speedglm",        "Fast GLM",
-  "SL.speedlm",         "Fast linear model",
-  "SL.step",            "Stepwise selection",
-  "SL.step.forward",    "Forward stepwise selection",
-  "SL.step.interaction","Stepwise with interactions",
-  "SL.stepAIC",         "Stepwise AIC selection",
-  "SL.svm",             "Support vector machine",
-  "SL.template",        "Template for custom wrapper",
-  "SL.xgboost",         "Extreme gradient boosting"
-))
-```
+| Wrapper              | Type |
+|----------------------|------|
+| SL.bartMachine       | Bayesian Additive Regression Trees (BART) |
+| SL.bayesglm          | Bayesian generalized linear model |
+| SL.biglasso          | Lasso / Elastic-Net (biglasso) |
+| SL.caret             | caret unified interface |
+| SL.caret.rpart       | caret interface for rpart |
+| SL.cforest           | Conditional inference forest |
+| SL.earth             | Multivariate Adaptive Regression Splines (MARS) |
+| SL.gam               | Generalized additive model |
+| SL.gbm               | Gradient boosting machine |
+| SL.glm               | Generalized linear model |
+| SL.glm.interaction   | GLM with interaction terms |
+| SL.glmnet            | Elastic-Net regularized GLM |
+| SL.ipredbagg         | Bagged trees (ipred) |
+| SL.kernelKnn         | Kernel k-nearest neighbors |
+| SL.knn               | k-nearest neighbors |
+| SL.ksvm              | Kernel support vector machine |
+| SL.lda               | Linear discriminant analysis |
+| SL.leekasso          | Leekasso variable selection |
+| SL.lm                | Linear model |
+| SL.loess             | Local regression (LOESS) |
+| SL.logreg            | Logistic regression |
+| SL.mean              | Mean predictor |
+| SL.nnet              | Neural network |
+| SL.nnls              | Non-negative least squares |
+| SL.polymars          | Polynomial MARS |
+| SL.qda               | Quadratic discriminant analysis |
+| SL.randomForest      | Random forest |
+| SL.ranger            | Fast random forest (ranger) |
+| SL.ridge             | Ridge regression |
+| SL.rpart             | CART decision tree |
+| SL.rpartPrune        | Pruned CART tree |
+| SL.speedglm          | Fast GLM |
+| SL.speedlm           | Fast linear model |
+| SL.step              | Stepwise selection |
+| SL.step.forward      | Forward stepwise selection |
+| SL.step.interaction  | Stepwise with interactions |
+| SL.stepAIC           | Stepwise AIC selection |
+| SL.svm               | Support vector machine |
+| SL.template          | Template for custom wrapper |
+| SL.xgboost           | Extreme gradient boosting |
 
-```{r echo = F}
-kable(tribble(
-  ~Wrapper, ~Type,
-  "All",                   "No screening (all variables retained)",
-  "screen.corP",           "Correlation screening (p-value based)",
-  "screen.corRank",        "Correlation rank screening",
-  "screen.glmnet",         "Screening via glmnet",
-  "screen.randomForest",   "Screening via random forest importance",
-  "screen.SIS",            "Sure Independence Screening",
-  "screen.template",       "Template for custom screening",
-  "write.screen.template", "Utility to create screening template"
-))
-```
+| Wrapper               | Type |
+|-----------------------|------|
+| All                   | No screening (all variables retained) |
+| screen.corP           | Correlation screening (p-value based) |
+| screen.corRank        | Correlation rank screening |
+| screen.glmnet         | Screening via glmnet |
+| screen.randomForest   | Screening via random forest importance |
+| screen.SIS            | Sure Independence Screening |
+| screen.template       | Template for custom screening |
+| write.screen.template | Utility to create screening template |
+
 ### Permutation variable importance
 
 <https://cran.r-project.org/web/packages/survex/refman/survex.html>

@@ -32,6 +32,7 @@ $$
 \mathbf{R}_i^\top
 \big)^\top,
 $$
+
 where 
 
 * $\mathbf{C}_i$ denotes clinical covariates 

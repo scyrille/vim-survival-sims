@@ -1,0 +1,177 @@
+---
+title: "Tests for data-generating mechanisms"
+author: "Stacy Cyrille"
+date: last-modified
+format: 
+  html:
+    keep-md: false
+    toc: true
+    toc-location: left
+    number-sections: true
+    embed-resources: true
+execute: 
+  # echo: false
+  message: false
+  warning: false
+fig-width: 8
+fig-align: "center"
+fig-cap-location: top
+html-math-method: mathml
+---
+
+```{r}
+library(tidyverse)
+library(MASS)
+library(knitr)
+
+rprojroot <- rprojroot::find_rstudio_root_file()
+source(file.path(rprojroot, "R/utils.R"))
+source(file.path(rprojroot, "R/generate_data.R"))
+```
+
+## DNA pathways
+
+**Example 1**
+
+We generate a simple example.
+
+-   Sample size: $n = 1000$
+-   Number of DNA pathways: $p = 3$
+-   Prevalence of DNA pathways: $\pi_1 = 0.1, \quad \pi_2 = 0.4, \quad \pi_3 = 0.6 \quad$
+-   Correlation matrix:
+
+$$\Sigma_D = \left(
+\begin{array}{ccc}
+\text{1} & \text{0} & \text{0.2} \\
+\text{0} & \text{1} & \text{0.5} \\
+\text{0.2} & \text{0.5} & \text{1}
+\end{array}
+\right)$$
+
+```{r}
+set.seed(2026)
+
+n <- 1000
+prev <- c(0.1, 0.4, 0.6)
+
+Sigma <- matrix(c(1,   0,   0.2,
+                  0,   1,   0.5,
+                  0.2, 0.5, 1), 
+                3, 3)
+
+dna1 <- simulate_dna_pathways(n, prev, Sigma)
+head(dna1)
+
+# Check prevalences
+colMeans(dna1)
+
+# Check dependence (Fisher’s exact tests)
+fisher.test(table(dna1$D1, dna1$D2))
+fisher.test(table(dna1$D1, dna1$D3))
+fisher.test(table(dna1$D2, dna1$D3))
+```
+
+------------------------------------------------------------------------
+
+**Example 2**
+
+We generate only uncorrelated variables.
+
+-   Sample size: $$n = 1000$$
+-   Number of DNA pathways: $$p_D = 3$$
+-   Prevalence of DNA pathways: $\pi_1 = 0.1, \quad \pi_2 = 0.4, \quad \pi_3 = 0.6 \quad$
+-   Correlation matrix:
+
+$$\Sigma_D = \left(
+\begin{array}{ccc}
+\text{1} & \text{0} & \text{0} \\
+\text{0} & \text{1} & \text{0} \\
+\text{0} & \text{0} & \text{1}
+\end{array}
+\right)$$
+
+```{r}
+set.seed(2026)
+Sigma0 <- diag(3)
+dna0 <- simulate_dna_pathways(n, prev, Sigma0)
+
+# Check prevalences
+colMeans(dna0)
+
+# Check dependence (Fisher’s exact tests)
+fisher.test(table(dna0$D1, dna0$D2))
+fisher.test(table(dna0$D1, dna0$D3))
+fisher.test(table(dna0$D2, dna0$D3))
+```
+
+------------------------------------------------------------------------
+
+**Example 3**
+
+We simulate correlated variables grouped into blocks.
+
+-   Sample size: $n = 1000$
+-   Number of DNA pathways: $p_D = 20$
+-   Prevalence of DNA pathways: $\pi_{p_D} \sim \mathcal{U}(0.1, 0.6)$
+-   Block size: $b_D = 5$
+-   Number of blocks: $K_D = 4$
+-   Within-block correlations: $\rho_{D;k1} = 0.6, \quad \rho_{D;k2} = 0.5, \quad \rho_{D;k3} = 0.4, \quad \rho_{D;k4} = 0.1$
+-   Between-block correlation: $\rho_{B_D} = 0.05$
+
+```{r}
+set.seed(2026)
+p <- 20 
+
+# Generate random prevalences 
+prev <- runif(20, 0.1, 0.6)
+prev
+# Initialize the matrix
+Sigma <- generate_block_corr(p, 
+                             block_size = 5, 
+                             rho_within = c(0.6, 0.5, 0.4, 0.1), 
+                             rho_between = 0.05)
+# Inspect the matrix 
+colnames(Sigma) <- paste0("D",1:p)
+rownames(Sigma) <- paste0("D",1:p)
+Sigma %>% 
+  as.data.frame()%>%
+    tibble::rownames_to_column("var1")%>%
+    pivot_longer(-var1, names_to = "var2")%>%
+    mutate(value = ifelse(var1==var2, NA, value),
+           var1 = factor(var1, levels = paste0("D",1:p)),
+           var2 = factor(var2, levels = paste0("D",1:p)))%>%
+    {
+      ggplot(., aes(var1, var2, fill = value)) +
+        geom_tile() +
+        scale_fill_distiller(palette = "RdBu", direction = -1, 
+                             limits = c(-1,1)) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        labs(fill = "Correlation coefficient", x ="", y = "", 
+             title = "True correlation matrix in the simulation design")
+    }
+
+# Simulate correlated data using this matrix 
+dna_block <- simulate_dna_pathways(n, prev, Sigma)
+
+# Check marginal prevalences
+data.frame(true_prev = prev, 
+           est_prev = colMeans(dna_block))%>%
+  rownames_to_column("variable")%>%
+  kable(format = "html", caption ="True and empirical prevalences", 
+        col.names = c("Variable","True prevalence","Estimated prevalence"))
+
+# 20x20 matrix of raw p-values
+pval_block <- pairwise_fisher(dna_block, names(dna_block))
+
+# Heatmap of raw p-values
+mat_long <- as.data.frame(as.table(pval_block$p.value.matrix))%>%
+  mutate(Freq = ifelse(Var1==Var2, NA, Freq))
+ggplot(mat_long, aes(Var1, Var2, fill = Freq)) +
+  geom_tile() +
+  scale_fill_viridis_c(option = "C", direction = -1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(fill = "Raw p-value", x ="", y = "", 
+       title = "Heatmap of raw p-values")
+```

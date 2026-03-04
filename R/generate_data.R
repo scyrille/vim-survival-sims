@@ -8,6 +8,7 @@
 #'
 #' @return A p x p correlation matrix.
 #'
+#' @export
 generate_block_corr <- function(p = 20, 
                                 block_size = 5, 
                                 rho_within = c(0.6, 0.5, 0.4, 0.3),
@@ -45,6 +46,8 @@ generate_block_corr <- function(p = 20,
 #' @param Sigma Numeric `p x p` correlation (or covariance) matrix for the latent Gaussian variables.
 #'
 #' @return A data.frame with `p` binary variables named `X1, ..., Xp`.
+#'
+#' @export
 simulate_dna_pathways <- function(n, 
                                   prev, 
                                   Sigma){
@@ -75,7 +78,8 @@ simulate_dna_pathways <- function(n,
 #' @param Sigma Numeric `p x p` correlation (or covariance) matrix for the latent Gaussian variables.
 #'
 #' @return A standardized matrix (n × p) of RNA pathway scores
-
+#' 
+#' @export
 simulate_rna_pathways <- function(n,
                                   p = 20,
                                   mu = 0, 

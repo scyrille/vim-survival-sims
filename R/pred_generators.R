@@ -1,4 +1,4 @@
-#' Estimate conditional survival function nuisance parameters using the Aalen additive hazards model
+#' Estimate conditional survival function nuisance parameters using the Aalen model
 #'
 #' @param time \code{n x 1} numeric vector of observed
 #' follow-up times. If there is censoring, these are the minimum of the

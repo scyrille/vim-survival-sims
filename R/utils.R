@@ -6,7 +6,8 @@
 #' @return A list with:
 #'   - p.value.matrix : symmetric matrix of raw p-values
 #'   - tidy.results   : long-format tibble of pairwise results
-
+#'   
+#' @export
 pairwise_fisher <- function(data, vars) {
   
   stopifnot(all(vars %in% names(data)))

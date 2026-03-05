@@ -12,13 +12,13 @@ First, under an **additive hazards framework**, we assess the accuracy and infer
 
 Second, under **mixed additive and multiplicative hazard structures**, we investigate the behavior of the VIM when both types of effects coexist. In this setting, conditional survival functions are estimated using ***global survival stacking***, ***survival Super Learner***, the ***Cox–Aalen model***, and ***random survival forests***.
 
-Third, in a high-dimensional binary setting mimicking genomic data, we assess the sensitivity of the VIM when covariates correspond to **rare alterations** with **heterogeneous effect sizes**, ranging from weak to strong, under a **proportional hazards model**.
+Third, we assess the sensitivity of the VIM when covariates correspond to **rare alterations** with **heterogeneous effect sizes**, ranging from weak to strong, under a **proportional hazards model**.
 
 Finally, we compare **exclusion-based variable importance** with **permutation-based variable importance** to examine differences in interpretation, stability, and empirical performance across the considered scenarios.
 
 ## Data-generation mechanisms
 
-We simulated multi-omics datasets combining DNA alterations, RNA pathway scores, and clinical covariates for $i = 1, ..., n$ individuals.
+We simulated multi-omics datasets combining DNA alterations and RNA pathway scores for $i = 1, ..., n$ individuals.
 
 ### Covariate structure
 
@@ -27,7 +27,6 @@ For each individual $i$, the full feature vector was defined as
 $$
 \mathbf{X}_i =
 \big(
-\mathbf{C}_i^\top,\;
 \mathbf{D}_i^\top,\;
 \mathbf{R}_i^\top
 \big)^\top,
@@ -35,17 +34,14 @@ $$
 
 where 
 
-* $\mathbf{C}_i$ denotes clinical covariates 
 * $\mathbf{D}_i$ denotes DNA variables,
 * $\mathbf{R}_i$ denotes RNA pathway scores.
 
 The total number of predictors was
 
 $$
-p = p_C+ p_D + p_R.
+p = p_D + p_R.
 $$
-
-### Clinical covariates simulation 
 
 ### DNA data simulation 
 
@@ -328,33 +324,34 @@ This baseline scenario evaluates the robustness of Wolock's model-agnostic
 variable importance measure (VIM) under correct model specification.
 Specifically, we assess whether competing nuisance-function estimators
 recover the true exclusion VIM when the data-generating mechanism follows
-an ***additive hazards model***.
+an **additive hazards model**.
 
 **Data generating mechanism**
 
-The covariates are generated *independently* as follows:
+Four binary covariates were generated *independently* with prevalences spanning 
+rare to frequent alterations, $X_j \sim Bernoulli(\pi_j)$ with 
+$\pi_j =(0.005, 0.02, 0.05, 0.20)$. 
 
-* $X = (X_{D_1}, X_{D_2}, X_{R_1}, X_{R_2})$
-* $X_{D_1}, X_{D_2} \sim \mathcal{B}(0.4)$
-* $X_{R_1}, X_{R_2} \sim \mathcal{N}(0,1)$
+Events times were simulated under the following time-constant additive hazards 
+model: 
 
-The event time follows an additive hazards model with constant effects: 
+$$\lambda(t|x)=\lambda_0+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3}+\beta_{4}X_{4}$$
 
-$$
-\beta_{D_{1}}=, \quad \beta_{D_{2}}=, \quad \beta_{R_{1}}=, \quad \beta_{R_{2}}=
-$$
+with $\lambda_0=0.05$ and $\beta=(0.06, 0.02, 0.005, 0)$. 
 
-with constant baseline hazard: $\lambda_0(t)=0.1$. 
-
-Censoring times were generated independently to yield approximately 20-25%
-right censoring.
+Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
+parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
+data-generating mechanism to achieve an expected censoring proportion of 
+approximately 20%, and the calibrated value was then fixed across all 
+simulation replicates. 
 
 **Nuisance functions estimators to compare**
 
-We compare the following approaches for estimating the nuisance functions required for VIM computation:
+We compare the following approaches for estimating the nuisance functions 
+required for VIM computation:
 
 * Aalen additive hazards model (`timereg::aalen`)
-* Local survival stacking (`survSuperLearner`)
+* Survival Super Learner (`survSuperLearner`)
 * Global survival stacking (`survML`)
 
 Since the data-generating mechanism follows an additive hazards model,
@@ -367,7 +364,8 @@ to nuisance-model choice.
 
 **Objective**
 
-This scenario evaluate the sensitivity of the exclusion VIM when the true hazard follows a ***Cox-Aalen model***.
+This scenario evaluate the sensitivity of the exclusion VIM when the true 
+hazard follows a **Cox-Aalen model**.
 
 **Data-generating mechanism**
 
@@ -377,13 +375,13 @@ The covariates are generated *independently* as follows:
 * $X_{D_1}, X_{D_2} \sim \mathcal{B}(0.4)$
 * $X_{R_1}, X_{R_2} \sim \mathcal{N}(0,1)$
 
-The event time follows a Cox-Aalen model: 
-
-$$
-\beta_{D_{1}}=, \quad \beta_{D_{2}}=, \quad \beta_{R_{1}}=, \quad \beta_{R_{2}}=
-$$
-
-with constant baseline hazard: $\lambda_0(t)=0.1$. 
+To generate mixed additive and multiplicative effects, event times were 
+simulated under a Cox-Aalen model with constant baseline hazard: 
+$\lambda_0(t)=0.05$. Additive effects were assigned to one binary and one 
+continuous covariate with coefficients $\beta_{D1}=0.06$ and $\beta_{R1}=0.005$, 
+respectively. Multiplicative (proportional hazards) effects were assigned to 
+one binary and one continuous covariate with coefficents $\beta_{D2}=0.5$ and
+$\beta_{R2}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
 
 Censoring times were generated independently to yield approximately 20-25%
 right censoring.
@@ -393,7 +391,7 @@ right censoring.
 We compare the following approaches for estimating the nuisance functions required for VIM computation:
 
 * Cox-Aalen model (`timereg::cox.aalen`)
-* Local survival stacking (`survSuperLearner`)
+* Survival Super Learner (`survSuperLearner`)
 * Global survival stacking (`survML`)
 
 ### Scenario 3 -  Rare genomic alterations with mixed effects under proportional hazards
@@ -429,6 +427,10 @@ We vary:
 * Sample size
 * Number of non-null variables 
 * Prevalence distribution of alterations 
+
+### Sensitivity to covariate correlations 
+
+For each scenario, we additionally evaluated the sensitivity of the VIM to correlations between covariates. Correlations were introduced between selected covariates while preserving their marginal distributions (binary or continuous). Specifically, we considered both weak and moderate correlation dependence between predictors, with pairwise correlations set to $\rho=0.3$ and $\rho=0.6$, respectively. This analysis allows us to assess the robustness of the estimated VIM in the presence of correlated covariates. 
 
 ### Compare exclusion variable importance to permutation variable importance
 

@@ -3,12 +3,15 @@ title: "Tests for data-generating mechanisms"
 author: "Stacy Cyrille"
 date: last-modified
 format: 
-  html:
-    keep-md: false
+  pdf:
     toc: true
-    toc-location: left
     number-sections: true
-    embed-resources: true
+  # html:
+  #   keep-md: false
+  #   toc: true
+  #   toc-location: left
+  #   number-sections: true
+  #   embed-resources: true
 execute: 
   # echo: false
   message: false
@@ -26,12 +29,11 @@ library(knitr)
 library(survival)
 library(timereg)
 
-rprojroot <- rprojroot::find_rstudio_root_file()
-source(file.path(rprojroot, "R/utils.R"))
-source(file.path(rprojroot, "R/generate_data.R"))
+source(here::here("R", "utils.R"))
+source(here::here("R", "generate_data.R"))
 ```
 
-## DNA pathways
+# DNA pathways
 
 **Example 1**
 
@@ -178,7 +180,7 @@ ggplot(mat_long, aes(Var1, Var2, fill = Freq)) +
        title = "Heatmap of raw p-values")
 ```
 
-## RNA pathways 
+# RNA pathways 
 
 **Example 1**
 
@@ -323,7 +325,7 @@ as.data.frame(cor(rna_block))%>%
   }
 ```
 
-## Aalen model 
+# Aalen model 
 
 ```{r}
 # Set seed for reproducibility 
@@ -370,8 +372,7 @@ par(mfrow=c(1,3))
 plot(aalen_fit2, ylim = c(-0.5,4))
 ```
 
-
-## Cox-Aalen model
+# Cox-Aalen model
 
 ```{r}
 # Set seed for reproducibility 
@@ -435,3 +436,232 @@ par(mfrow = c(1,3))
 plot(cox_aalen_fit2, ylim = c(-0.5, 5)) 
 ```
 
+# Simulations
+
+All simulations were repeated across $B=1000$ replications. 
+
+## DNA pathways 
+
+For each replicate, pairwise associations between DNA-based pathways were tested using Fisher's exact test, and the empirical type I error was estimated as the proportion of replications with p-values below the nominal significance level ($\alpha=0.05$)
+
+We simulate correlated variables grouped into blocks.
+
+* Sample size: $n = 1000$
+* Number of DNA pathways: $p_D = 20$
+* Prevalence of DNA pathways: $\pi_{p_D} \sim \mathcal{U}(0.1, 0.6)$
+* Block size: $b_D = 5$
+* Number of blocks: $K_D = 4$
+* Within-block correlations: $\rho_{D;k1} = 0.6, \quad \rho_{D;k2} = 0.5, \quad \rho_{D;k3} = 0.4, \quad \rho_{D;k4} = 0.05$
+* Between-block correlation: $\rho_{B_D} = 0.01$
+
+```{r eval=FALSE}
+set.seed(2026)
+B <- 1000
+n <- 1000
+p <- 20
+prev <- runif(p, 0.1, 0.6) %>%
+  set_names(paste0("D",1:p))
+Sigma <- generate_block_corr(p, 
+                             block_size = 5, 
+                             rho_within = c(0.6, 0.5, 0.4, 0.05),
+                             rho_between = 0.01)
+
+# Inspect the matrix 
+colnames(Sigma) <- paste0("D",1:20)
+rownames(Sigma) <- paste0("D",1:20)
+Sigma %>% 
+  as.data.frame()%>%
+    tibble::rownames_to_column("var1")%>%
+    pivot_longer(-var1, names_to = "var2")%>%
+    mutate(value = ifelse(var1==var2, NA, value),
+           var1 = factor(var1, levels = paste0("D",1:20)),
+           var2 = factor(var2, levels = paste0("D",1:20)))%>%
+    {
+      ggplot(., aes(var1, var2, fill = value)) +
+        geom_tile() +
+        scale_fill_distiller(palette = "RdBu", direction = -1, 
+                             limits = c(-1,1)) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        labs(fill = "Correlation coefficient", x ="", y = "", 
+             title = "True correlation matrix in the simulation design")
+    }
+
+# Run simulations
+dna_sims <- replicate(B,
+                      simulate_dna_pathways(n, prev, Sigma),
+                      simplify = FALSE) %>%
+  imap(~ mutate(.x, B = .y)) %>%
+  bind_rows()
+
+# Prevalence bias 
+dna_sims %>%
+  bind_rows()%>%
+  pivot_longer(-B, names_to = "pathway", values_to = "est_prev") %>%
+  dplyr::full_join(rownames_to_column(data.frame(true_prev = prev), 
+                                      "pathway"), by ="pathway")%>%
+  group_by(pathway) %>%
+  summarize(bias = estimate_bias(true = true_prev, est = est_prev),
+            pathway = factor(pathway, levels = paste0("D", 1:20)),
+            .groups = "drop")%>%
+  {
+    ggplot(., aes(x = pathway, y = bias, colour = pathway))+
+      geom_point(aes(fill = "pathway"))+
+      geom_hline(yintercept = 0, linetype = "dashed")+
+      scale_y_continuous(limits = c(-0.05, 0.05))+
+      labs(x = "Pathway", y = "Bias", title = "Prevalence bias")+
+      theme_minimal()+
+      theme(legend.position = "none")
+  }
+
+# Type I error 
+dna_sims_pval <- dna_sims %>%
+  group_split(B) %>%
+  map(~.x %>% 
+        dplyr::select(-B)%>%
+        pairwise_fisher(vars = names(.)))
+
+# Heatmap of mean raw p-values
+dna_sims_pval %>%
+  map(~as.data.frame(as.table(.x$p.value.matrix))%>%
+        mutate(Freq = ifelse(Var1==Var2, NA, Freq)))%>%
+  reduce(bind_rows, .id = "B")%>%
+  group_by(Var1, Var2)%>%
+  summarise(mean_p.value = mean(Freq), .groups = "drop")%>%
+  {
+    ggplot(., aes(Var1, Var2, fill = mean_p.value)) +
+      geom_tile() +
+      scale_fill_viridis_c(option = "C", direction = -1) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(fill = "Mean raw p-value", x ="", y = "", 
+           title = "Heatmap of mean raw p-values")
+  }
+
+# Heatmap of the proportion of replications with p-values < 0.05
+dna_sims_pval %>%
+  map(~as.data.frame(as.table(.x$p.value.matrix))%>%
+        mutate(Freq = ifelse(Var1==Var2, NA, Freq)))%>%
+  reduce(bind_rows, .id = "B")%>%
+  group_by(Var1, Var2)%>%
+  summarise(mean_typeI = mean(Freq < 0.05, na.rm = TRUE), 
+            .groups = "drop")%>%
+  {
+    ggplot(., aes(Var1, Var2, fill = mean_typeI)) +
+      geom_tile() +
+      scale_fill_viridis_c(option = "C", direction = -1) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(fill = "Proportion of replications \nwith p-values < 0.05", x ="", y = "", 
+           title = "Heatmap of the proportion of replications with p-values < 0.05")
+  }
+```
+
+## RNA pathways 
+
+For each pathway, we computed the empirical mean, variance, and pairwise correlation coefficients of the RNA pathways across simulation replicates. 
+Mean, variance and correlation coefficients were averaged across replicates. 
+
+* Sample size: $n = 1000$
+* Number of RNA pathways $p_R = 20$
+* Block size: $b_R = 5$
+* Number of blocks: $K_R = 4$
+* Within-block correlations: $\rho_{R;k1} = 0.7, \quad \rho_{R;k2} = -0.2, \quad \rho_{R;k3} = 0.5, \quad \rho_{R;k4} = 0.3$
+* Between-block correlation: $\rho_{B_R} = 0.1$
+
+```{r eval=FALSE}
+set.seed(2026)
+p <- 20 
+mu <- 0
+
+# Initialize the matrix
+Sigma <- generate_block_corr(p, 
+                             block_size = 5, 
+                             rho_within = c(0.7, -0.2, 0.5, 0.3), 
+                             rho_between = 0.1)
+colnames(Sigma) <- paste0("R",1:20)
+rownames(Sigma) <- paste0("R",1:20)
+
+# Run simulations 
+rna_sims <- replicate(B,
+                      simulate_rna_pathways(n, p, mu, Sigma),
+                      simplify = FALSE)
+
+# Check mean 
+rna_sims %>%
+  map(~colMeans(.x))%>%
+  reduce(bind_rows)%>%
+  summarise_all(mean)%>%
+  pivot_longer(everything())%>%
+  {
+    ggplot(., aes(x = name, y = value, colour = name))+
+      geom_point()+
+      geom_hline(yintercept = 0, linetype = "dashed")+
+      scale_y_continuous(limits = c(-0.025, 0.025))+
+      labs(x = "Pathway", y = "Empirical mean", 
+           title = "Empirical mean across replicates")+
+      theme_minimal()+
+      theme(legend.position = "none")
+  }
+
+# Check variance
+rna_sims %>%
+  map(~ apply(.x, 2, var))%>%
+  reduce(bind_rows)%>%
+  summarise_all(mean)%>%
+  pivot_longer(everything())%>%
+  {
+    ggplot(., aes(x = name, y = value, colour = name))+
+      geom_point()+
+      geom_hline(yintercept = 1, linetype = "dashed")+
+      labs(x = "Pathway", y = "Average variance", 
+           title = "Average variance across replicates")+
+      theme_minimal()+
+      theme(legend.position = "none")
+  }
+```
+
+```{r eval=FALSE}
+#| layout-nrow: 2
+
+# True correlation matrix 
+Sigma %>% 
+  as.data.frame()%>%
+    tibble::rownames_to_column("var1")%>%
+    pivot_longer(-var1, names_to = "var2")%>%
+    mutate(value = ifelse(var1==var2, NA, value),
+           var1 = factor(var1, levels = paste0("R",1:20)),
+           var2 = factor(var2, levels = paste0("R",1:20)))%>%
+    {
+      ggplot(., aes(var1, var2, fill = value)) +
+        geom_tile() +
+        scale_fill_distiller(palette = "RdBu", direction = -1, 
+                             limits = c(-1,1)) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        labs(fill = "Correlation coefficient", x ="", y = "", 
+             title = "True correlation matrix in the simulation design")
+    }
+
+# Average correlation matrix across simulation replicates
+cor_sims_rna <- rna_sims %>%
+  map(cor) %>%
+  reduce(`+`) / length(rna_sims)
+
+as.data.frame(cor_sims_rna)%>%
+  tibble::rownames_to_column("var1")%>%
+  pivot_longer(-var1, names_to = "var2")%>%
+  mutate(value = ifelse(var1==var2, NA, value),
+         var1 = factor(var1, levels = paste0("R",1:20)),
+         var2 = factor(var2, levels = paste0("R",1:20)))%>%
+  {
+    ggplot(., aes(var1, var2, fill = value)) +
+      geom_tile() +
+      scale_fill_distiller(palette = "RdBu", direction = -1, 
+                           limits = c(-1,1)) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(fill = "Correlation coefficient", x ="", y = "", 
+           title = "Average correlation matrix across simulation replicates")
+  }
+```

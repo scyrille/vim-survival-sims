@@ -27,7 +27,9 @@ library(tidyverse)
 library(MASS)
 library(knitr)
 library(survival)
+library(survminer)
 library(timereg)
+library(gtsummary)
 
 source(here::here("R", "utils.R"))
 source(here::here("R", "generate_data.R"))
@@ -327,49 +329,108 @@ as.data.frame(cor(rna_block))%>%
 
 # Aalen model 
 
+$$\lambda(t|x)=\lambda_0+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3}+\beta_{4}X_{4}$$
+where:
+
+* $\lambda_0=0.05$ (constant baseline hazard)
+* $\beta = (0.06, 0.02, 0.005, 0)$ 
+* $X_{1}, X_{2}$ are binary covariates with $\pi_{1}=0.4$ and $\pi_{2}=0.1$
+* $X_{3}, X_{4}$ are continuous (GSVA-like) covariates 
+
 ```{r}
 # Set seed for reproducibility 
 set.seed(2026)
 
 # Sample size 
-n <- 1000
+n <- 5000
 
 # Generate covariates
-p <- 3
-Sigma <- matrix(c(1, 0, 0,
-                  0, 1, 0,
-                  0, 0, 1), 
-                3, 3)
-X <- as.matrix(simulate_rna_pathways(n, p, mu = 0, Sigma))
+p <- 4
+Sigma <- matrix(c(1, 0, 0, 0,
+                  0, 1, 0, 0,
+                  0, 0, 1, 0,
+                  0, 0, 0, 1), 
+                p, p)
+# prev <- c(0.005, 0.02, 0.05, 0.20)
+prev <- rep(0.5, 4)
+X <- simulate_dna_pathways(n, prev, Sigma)
+# beta <- c(0.06, 0.02, 0.005, 0)  
+beta <- c(0.08, 0.02, 0.04, 0) 
+lambda0 <- 0.05
+censor_max <- calibrate_censor_max_aalen(lambda0 = lambda0,
+                                         beta = beta,
+                                         prev = prev,
+                                         target_cens = 0.01, 
+                                         seed = 2026)
+data <- simulate_aalen_time(X, lambda0, beta, censor_max)
 
-# Generate time to event data
-beta <- c(0, 0.02, 0.06)  
-lambda0 <- 0.07
-lambda_i <- lambda0 + drop(X %*% beta)
-lambda_i <- pmax(lambda_i, 1e-8)
-T <- rexp(n, rate = lambda_i)
-cens_rate <- 0.05
-C <- rexp(n, rate = cens_rate)
-time <- pmin(T, C)
-event <- as.integer(T <= C)
-data <- data.frame(time, event, X)
+# Censoring rate 
+mean(1 - data$event)
+
+# Kaplan-Meier 
+gtsummary::tbl_survfit(survfit(Surv(time, event)~1, data), 
+                       probs = c(0.25, 0.5, 0.75))%>%
+  gtsummary::add_n()%>%
+  gtsummary::add_nevent()
+ggsurvplot(survfit(Surv(time, event)~1, data), data)
+par(mfrow=c(2,2))
+ggsurvplot(survfit(Surv(time, event)~D1, data), data)
+ggsurvplot(survfit(Surv(time, event)~D2, data), data)
+ggsurvplot(survfit(Surv(time, event)~D3, data), data)
+ggsurvplot(survfit(Surv(time, event)~D4, data), data)
 
 # Fit the Aalen model
 # All components of the model have nonparametric time-varying effects.
-aalen_fit <- timereg::aalen(Surv(time, event)~R1+R2+R3, 
-                            data = data)
+aalen_fit <- timereg::aalen(Surv(time, event)~D1+D2+D3+D4, data = data)
 summary(aalen_fit)
 
+# Coefficients
+# cum <- aalen_fit$cum
+# tmax <- max(cum[, "time"])
+# B_at_tmax <- cum[nrow(cum), -c(1,2)]
+# est_beta <- as.vector(B_at_tmax / tmax)
+# est_beta
+  
 # Plot the non-parametric cumulative regression coefficients with 95% CI
-par(mfrow=c(1,4))
+par(mfrow=c(1,5))
 plot(aalen_fit, ylim = c(-0.5,4))
 
-# Fit the model with the effect of R1 being constant
-aalen_fit2 <- timereg::aalen(Surv(time, event)~const(R1)+R2+R3, 
-                            data = data)
+# Fit the model with the effect of R2 being constant
+aalen_fit2 <- timereg::aalen(Surv(time, event)~D1+D2+D3+const(D4), data = data)
 summary(aalen_fit2)
-par(mfrow=c(1,3))
+par(mfrow=c(1,4))
 plot(aalen_fit2, ylim = c(-0.5,4))
+```
+
+```{r}
+R <- 100
+test_aalen <- replicate(R, {
+  X <- simulate_dna_pathways(n = 1000, prev, Sigma)
+  data <- simulate_aalen_time(X, lambda0, beta, censor_max)
+  #'For constant effects: cumulative coefficient B_j(t) ≈ beta_j * t.
+  #'Approximate beta_j by B_j(t_max) / t_max using the last available 
+  #'cumulative estimate.
+  #'timereg stores cumulative estimates in fit_obj$cum: matrix with columns 
+  #'(time, (coef, se) per covariate).
+  fit_obj <- timereg::aalen(Surv(time, event)~D1+D2+D3+D4, data)
+  cum <- fit_obj$cum
+  tmax <- max(cum[, "time"])
+  B_at_tmax <- cum[nrow(cum), -c(1,2)]
+  est_beta <- as.vector(B_at_tmax / tmax)
+  
+  data.frame(
+    prev_D1   = mean(data$D1),
+    prev_D2   = mean(data$D2),
+    prev_D3   = mean(data$D3),
+    prev_D4   = mean(data$D4),
+    cens_rate = mean(1 - data$event),
+    beta_D1   = est_beta[1],
+    beta_D2   = est_beta[2],
+    beta_D3   = est_beta[3],
+    beta_D4   = est_beta[4]
+    )}, simplify = F)
+
+colMeans(bind_rows(test_aalen))
 ```
 
 # Cox-Aalen model

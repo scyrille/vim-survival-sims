@@ -18,51 +18,28 @@ Finally, we compare **exclusion-based variable importance** with **permutation-b
 
 ## Data-generation mechanisms
 
-We simulated multi-omics datasets combining DNA alterations and RNA pathway scores for $i = 1, ..., n$ individuals.
-
-### Covariate structure
-
-For each individual $i$, the full feature vector was defined as 
-
-$$
-\mathbf{X}_i =
-\big(
-\mathbf{D}_i^\top,
-\mathbf{R}_i^\top
-\big)^\top,
-$$
-
-where 
-
-* $\mathbf{D}_i$ denotes DNA variables,
-* $\mathbf{R}_i$ denotes RNA pathway scores.
-
-The total number of predictors was
-
-$$
-p = p_D + p_R.
-$$
+We simulated datasets combining DNA alterations and RNA pathway scores for $i = 1, ..., n$ individuals.
 
 ### DNA data simulation 
 
 DNA pathways were modeled as correlated binary variables:
 
 $$
-D_{ij} \in \{0,1\}, \quad j = 1,\dots,p_D,
+X_{ij} \in \{0,1\}, \quad j = 1,\dots,p,
 $$
 
-where $D_{ij} = 1$ indicates the presence of a DNA alteration.
+where $X_{ij} = 1$ indicates the presence of a DNA alteration.
 
 Each pathway had marginal prevalence
 
 $$
-\pi_j = P(D_{ij} = 1).
+\pi_j = P(X_{ij} = 1).
 $$
 
 To induce correlation between pathways, a latent Gaussian copula model was used:
 
 $$
-\mathbf{Z}_i \sim \mathcal{N}(0, \Sigma_D),
+\mathbf{Z}_i \sim \mathcal{N}(0, \Sigma),
 $$
 
 where $\Sigma_D$ is a block-structured correlation matrix.
@@ -70,14 +47,14 @@ where $\Sigma_D$ is a block-structured correlation matrix.
 Binary variables were obtained through probit thresholding:
 
 $$
-D_{ij} = \mathbf{1}\big(Z_{ij} < \Phi^{-1}(\pi_j)\big),
+X_{ij} = \mathbf{1}\big(Z_{ij} < \Phi^{-1}(\pi_j)\big),
 $$
 
 where $\Phi$ denotes the standard normal cumulative distribution function.  
 This guarantees
 
 $$
-P(D_{ij} = 1) = \pi_j.
+P(X_{ij} = 1) = \pi_j.
 $$
 
 $$
@@ -107,12 +84,14 @@ RNA data were simulated as continuous pathway-level scores to mimic GSVA-like en
 For each individual $i = 1, \dots, n$,
 
 $$
-\mathbf{R}_i \sim \mathcal{N}(0, \Sigma_R),
+\mathbf{X}_i \sim \mathcal{N}(0, \Sigma),
 $$
 
-where $\Sigma_R \in \mathbb{R}^{p \times p}$ is a block-correlation matrix reflecting biological co-regulation between pathways.
+where $\Sigma \in \mathbb{R}^{p \times p}$ is a block-correlation matrix reflecting biological co-regulation between pathways.
 
-**Block correlation structure**
+To reproduce GSVA outputs as used in practice, RNA scores were standardized across samples
+
+### Block correlation structure 
 
 Pathways were partitioned into $K = 4$ blocks of equal size $b = 5$ (so $p = 20$).  
 Let
@@ -121,7 +100,7 @@ $$
 B_k = \{(k-1)b+1, \dots, kb\}, \quad k=1,\dots,4.
 $$
 
-The correlation matrix $\Sigma_R = (\sigma_{jk})$ was defined element-wise as
+The correlation matrix $\Sigma = (\sigma_{jk})$ was defined element-wise as
 
 $$
 \sigma_{jk} =
@@ -135,32 +114,12 @@ $$
 Equivalently, each diagonal block can be written as
 
 $$
-\Sigma_{R,k}=(1-\rho_k) I_b+\rho_k \mathbf{1}_b \mathbf{1}_b^\top,
+\Sigma_{X,k}=(1-\rho_k) I_b+\rho_k \mathbf{1}_b \mathbf{1}_b^\top,
 $$
 
 where $I_b$ denotes the $b \times b$ identity matrix and $\mathbf{1}_b$ is a $b$-dimensional vector of ones.
 
 This structure induces strong positive co-regulation in block 1, moderate positive correlation in block 3, weak correlation in block 4, and antagonistic regulation (negative correlation) in block 2, thereby mimicking heterogeneous biological pathway interactions.
-
-**Standardization**
-
-To reproduce GSVA outputs as used in practice, RNA scores were standardized across samples:
-
-$$
-\tilde{R}_{ik}=\frac{R_{ik} - \bar{R}_k}{s_k},
-$$
-
-where $\bar{R}_k$ and $s_k$ denote the sample mean and standard deviation of pathway $k$.
-
-Consequently,
-
-$$
-\mathbb{E}(\tilde{R}_{ik}) = 0,
-\qquad
-\mathrm{Var}(\tilde{R}_{ik}) = 1.
-$$
-
-All subsequent analyses were performed using standardized RNA scores.
 
 ### Simulation of time-to-event outcomes
 
@@ -190,13 +149,6 @@ $$
 
 where $\lambda_0(t)$ denotes the baseline hazard function and 
 $\boldsymbol{\beta}$ represents the vector of additive hazard effects.
-
-To ensure non-negativity of the hazard function, regression parameters 
-were chosen such that
-
-$$
-\lambda_0(t) + \mathbf{X}_i^\top \boldsymbol{\beta} \ge 0 \quad \text{for all } i.
-$$
 
 **Cox-Aalen model**
 
@@ -371,16 +323,16 @@ hazard follows a **Cox-Aalen model**.
 The covariates are generated *independently* as follows:
 
 * $X = (X_{D_1}, X_{D_2}, X_{R_1}, X_{R_2})$
-* $X_{D_1}, X_{D_2} \sim \mathcal{B}(0.4)$
-* $X_{R_1}, X_{R_2} \sim \mathcal{N}(0,1)$
+* $X_{1}, X_{2} \sim \mathcal{B}(0.4)$
+* $X_{3}, X_{4} \sim \mathcal{N}(0,1)$
 
 To generate mixed additive and multiplicative effects, event times were 
 simulated under a Cox-Aalen model with constant baseline hazard: 
-$\lambda_0(t)=0.05$. Additive effects were assigned to one binary and one 
-continuous covariate with coefficients $\beta_{D1}=0.06$ and $\beta_{R1}=0.005$, 
-respectively. Multiplicative (proportional hazards) effects were assigned to 
-one binary and one continuous covariate with coefficents $\beta_{D2}=0.5$ and
-$\beta_{R2}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
+$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$ and $X_3$ with 
+coefficients $\beta_{1}=0.06$ and $\beta_{3}=0.005$, respectively. 
+Multiplicative (proportional hazards) effects were assigned to 
+$X_2$ and $X_4$ with coefficents $\beta_{2}=0.5$ and
+$\beta_{4}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
 
 Censoring times were generated independently to yield approximately 20-25%
 right censoring.
@@ -409,7 +361,7 @@ The goal is to assess whether VIM can:
 
 All covariates were generated independently as follows: 
 
-$$X_j \sim \mathcal{B}(\pi_j)$$ with $\pi \in \{0.01, 0.1\}$ to reflect genomic rarity. 
+$$X_j \sim \mathcal{B}(\pi_j)$$ with $\pi \in {\{0.01, 0.1\}}$ to reflect genomic rarity. 
 
 The event times follows a Cox model with a with constant baseline hazard $\lambda_0(t) = 0.1$. We partional covariates into four groups: 
 

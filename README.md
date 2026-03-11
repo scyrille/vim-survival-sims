@@ -27,7 +27,7 @@ For each individual $i$, the full feature vector was defined as
 $$
 \mathbf{X}_i =
 \big(
-\mathbf{D}_i^\top,\;
+\mathbf{D}_i^\top,
 \mathbf{R}_i^\top
 \big)^\top,
 $$
@@ -218,9 +218,8 @@ We considered two estimators of variable importance, targeting distinct estimand
 
 **Definition**
 
-We consider the model-agnostic variable importance measure proposed by Wolock *et al.*, defined through covariate exclusion. FOr a given prediction time $t_0$ and covariate $X_j$, the VIM quantifies the change in predictive performance when $X_j$ is removed from the prediction function. 
+We consider the model-agnostic variable importance measure proposed by Wolock *et al.*, defined through covariate exclusion. For a given prediction time $t_0$ and covariate $X_j$, the VIM quantifies the change in predictive performance when $X_j$ is removed from the prediction function. 
 
-Let $\psi(P)$
 We defined a nonparametric variable importance measure (VIM) based on the predictive value of a pathway set within a flexible survival prediction model fitted with `survML`. Let $V(.)$ denote a time-dependent predictive performance functional, evaluated on predictions. The variable importance measure for covariate $X_j$ at time $t_0$, $\psi_j(t_0)$, was defined as the difference in predictive performance between a model fit using the full feature set, $V_{full}$ and a model fit after excluding the pathway or group of pathways of interest, $V_{reduced}$:
 $$\psi_j(P_0) = V_{full} - V_{reduced}$$
 

@@ -16,11 +16,13 @@ execute:
   # echo: false
   message: false
   warning: false
-fig-width: 8
+fig-height: 6
 fig-align: "center"
 fig-cap-location: top
 html-math-method: mathml
 ---
+
+\newpage
 
 ```{r}
 library(tidyverse)
@@ -33,9 +35,14 @@ library(gtsummary)
 
 source(here::here("R", "utils.R"))
 source(here::here("R", "generate_data.R"))
+source(here::here("R", "performance_eval.R"))
+
+options(scipen = 999)
 ```
 
-# DNA pathways
+\newpage
+
+# Simulate binary variables  
 
 **Example 1**
 
@@ -46,7 +53,7 @@ We generate a simple example.
 -   Prevalence of DNA pathways: $\pi_1 = 0.1, \quad \pi_2 = 0.4, \quad \pi_3 = 0.6 \quad$
 -   Correlation matrix:
 
-$$\Sigma_D = \left(
+$$\Sigma = \left(
 \begin{array}{ccc}
 \text{1} & \text{0} & \text{0.2} \\
 \text{0} & \text{1} & \text{0.5} \\
@@ -65,16 +72,16 @@ Sigma <- matrix(c(1,   0,   0.2,
                   0.2, 0.5, 1), 
                 3, 3)
 
-dna1 <- simulate_dna_pathways(n, prev, Sigma)
+dna1 <- data.frame(simulate_dna_pathways(n, prev, Sigma))
 head(dna1)
 
 # Check prevalences
 colMeans(dna1)
 
 # Check dependence (Fisher’s exact tests)
-fisher.test(table(dna1$D1, dna1$D2))
-fisher.test(table(dna1$D1, dna1$D3))
-fisher.test(table(dna1$D2, dna1$D3))
+fisher.test(table(dna1$X1, dna1$X2))
+fisher.test(table(dna1$X1, dna1$X3))
+fisher.test(table(dna1$X2, dna1$X3))
 ```
 
 ------------------------------------------------------------------------
@@ -84,11 +91,11 @@ fisher.test(table(dna1$D2, dna1$D3))
 We generate only uncorrelated variables.
 
 -   Sample size: $$n = 1000$$
--   Number of DNA pathways: $$p_D = 3$$
+-   Number of DNA pathways: $$p = 3$$
 -   Prevalence of DNA pathways: $\pi_1 = 0.1, \quad \pi_2 = 0.4, \quad \pi_3 = 0.6 \quad$
 -   Correlation matrix:
 
-$$\Sigma_D = \left(
+$$\Sigma = \left(
 \begin{array}{ccc}
 \text{1} & \text{0} & \text{0} \\
 \text{0} & \text{1} & \text{0} \\
@@ -99,15 +106,15 @@ $$\Sigma_D = \left(
 ```{r}
 set.seed(2026)
 Sigma0 <- diag(3)
-dna0 <- simulate_dna_pathways(n, prev, Sigma0)
+dna0 <- data.frame(simulate_dna_pathways(n, prev, Sigma0))
 
 # Check prevalences
 colMeans(dna0)
 
 # Check dependence (Fisher’s exact tests)
-fisher.test(table(dna0$D1, dna0$D2))
-fisher.test(table(dna0$D1, dna0$D3))
-fisher.test(table(dna0$D2, dna0$D3))
+fisher.test(table(dna0$X1, dna0$X2))
+fisher.test(table(dna0$X1, dna0$X3))
+fisher.test(table(dna0$X2, dna0$X3))
 ```
 
 ------------------------------------------------------------------------
@@ -117,12 +124,12 @@ fisher.test(table(dna0$D2, dna0$D3))
 We simulate correlated variables grouped into blocks.
 
 -   Sample size: $n = 1000$
--   Number of DNA pathways: $p_D = 20$
--   Prevalence of DNA pathways: $\pi_{p_D} \sim \mathcal{U}(0.1, 0.6)$
--   Block size: $b_D = 5$
--   Number of blocks: $K_D = 4$
--   Within-block correlations: $\rho_{D;k1} = 0.6, \quad \rho_{D;k2} = 0.5, \quad \rho_{D;k3} = 0.4, \quad \rho_{D;k4} = 0.1$
--   Between-block correlation: $\rho_{B_D} = 0.05$
+-   Number of DNA pathways: $p = 20$
+-   Prevalence of DNA pathways: $\pi \sim \mathcal{U}(0.1, 0.6)$
+-   Block size: $b = 5$
+-   Number of blocks: $K = 4$
+-   Within-block correlations: $\rho_{k1} = 0.6, \quad \rho_{k2} = 0.5, \quad \rho_{k3} = 0.4, \quad \rho_{k4} = 0.1$
+-   Between-block correlation: $\rho_{B} = 0.05$
 
 ```{r}
 set.seed(2026)
@@ -137,15 +144,15 @@ Sigma <- generate_block_corr(p,
                              rho_within = c(0.6, 0.5, 0.4, 0.1), 
                              rho_between = 0.05)
 # Inspect the matrix 
-colnames(Sigma) <- paste0("D",1:p)
-rownames(Sigma) <- paste0("D",1:p)
+colnames(Sigma) <- paste0("X",1:p)
+rownames(Sigma) <- paste0("X",1:p)
 Sigma %>% 
   as.data.frame()%>%
     tibble::rownames_to_column("var1")%>%
     pivot_longer(-var1, names_to = "var2")%>%
     mutate(value = ifelse(var1==var2, NA, value),
-           var1 = factor(var1, levels = paste0("D",1:p)),
-           var2 = factor(var2, levels = paste0("D",1:p)))%>%
+           var1 = factor(var1, levels = paste0("X",1:p)),
+           var2 = factor(var2, levels = paste0("X",1:p)))%>%
     {
       ggplot(., aes(var1, var2, fill = value)) +
         geom_tile() +
@@ -158,7 +165,7 @@ Sigma %>%
     }
 
 # Simulate correlated data using this matrix 
-dna_block <- simulate_dna_pathways(n, prev, Sigma)
+dna_block <- data.frame(simulate_dna_pathways(n, prev, Sigma))
 
 # Check marginal prevalences
 data.frame(true_prev = prev, 
@@ -182,17 +189,138 @@ ggplot(mat_long, aes(Var1, Var2, fill = Freq)) +
        title = "Heatmap of raw p-values")
 ```
 
-# RNA pathways 
+------------------------------------------------------------------------
+
+All simulations were repeated across $R=100$ replications. 
+
+For each replicate, pairwise associations between DNA-based pathways were tested using Fisher's exact test, and the empirical type I error was estimated as the proportion of replications with p-values below the nominal significance level ($\alpha=0.05$)
+
+We simulate correlated variables grouped into blocks.
+
+* Sample size: $n = 1000$
+* Number of DNA pathways: $p = 20$
+* Prevalence of DNA pathways: $\pi \sim \mathcal{U}(0.1, 0.6)$
+* Block size: $b = 5$
+* Number of blocks: $K = 4$
+* Within-block correlations: $\rho_{k1} = 0.6, \quad \rho_{k2} = 0.5, \quad \rho_{k3} = 0.4, \quad \rho_{k4} = 0.05$
+* Between-block correlation: $\rho_{B} = 0.01$
+
+```{r eval=FALSE}
+set.seed(2026)
+R <- 1000
+n <- 1000
+p <- 20
+prev <- runif(p, 0.1, 0.6) %>%
+  set_names(paste0("X",1:p))
+Sigma <- generate_block_corr(p, 
+                             block_size = 5, 
+                             rho_within = c(0.6, 0.5, 0.4, 0.05),
+                             rho_between = 0.01)
+
+# Inspect the matrix 
+colnames(Sigma) <- paste0("X",1:20)
+rownames(Sigma) <- paste0("X",1:20)
+Sigma %>% 
+  as.data.frame()%>%
+    tibble::rownames_to_column("var1")%>%
+    pivot_longer(-var1, names_to = "var2")%>%
+    mutate(value = ifelse(var1==var2, NA, value),
+           var1 = factor(var1, levels = paste0("D",1:20)),
+           var2 = factor(var2, levels = paste0("D",1:20)))%>%
+    {
+      ggplot(., aes(var1, var2, fill = value)) +
+        geom_tile() +
+        scale_fill_distiller(palette = "RdBu", direction = -1, 
+                             limits = c(-1,1)) +
+        theme_minimal() +
+        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+        labs(fill = "Correlation coefficient", x ="", y = "", 
+             title = "True correlation matrix in the simulation design")
+    }
+
+# Run simulations
+dna_sims <- replicate(R,
+                      simulate_dna_pathways(n, prev, Sigma),
+                      simplify = FALSE) %>%
+  imap(~ mutate(data.frame(.x), R = .y)) %>%
+  bind_rows()
+
+# Prevalence bias 
+dna_sims %>%
+  bind_rows()%>%
+  pivot_longer(-R, names_to = "pathway", values_to = "est_prev") %>%
+  dplyr::full_join(rownames_to_column(data.frame(true_prev = prev), 
+                                      "pathway"), by ="pathway")%>%
+  group_by(pathway) %>%
+  summarize(bias = estimate_bias(true = true_prev, est = est_prev),
+            pathway = factor(pathway, levels = paste0("D", 1:20)),
+            .groups = "drop")%>%
+  {
+    ggplot(., aes(x = pathway, y = bias, colour = pathway))+
+      geom_point(aes(fill = "pathway"))+
+      geom_hline(yintercept = 0, linetype = "dashed")+
+      scale_y_continuous(limits = c(-0.05, 0.05))+
+      labs(x = "Pathway", y = "Bias", title = "Prevalence bias")+
+      theme_minimal()+
+      theme(legend.position = "none")
+  }
+
+# Type I error 
+dna_sims_pval <- dna_sims %>%
+  group_split(R) %>%
+  map(~.x %>% 
+        dplyr::select(-R)%>%
+        pairwise_fisher(vars = names(.)))
+
+# Heatmap of mean raw p-values
+dna_sims_pval %>%
+  map(~as.data.frame(as.table(.x$p.value.matrix))%>%
+        mutate(Freq = ifelse(Var1==Var2, NA, Freq)))%>%
+  reduce(bind_rows, .id = "R")%>%
+  group_by(Var1, Var2)%>%
+  summarise(mean_p.value = mean(Freq), .groups = "drop")%>%
+  {
+    ggplot(., aes(Var1, Var2, fill = mean_p.value)) +
+      geom_tile() +
+      scale_fill_viridis_c(option = "C", direction = -1) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(fill = "Mean raw p-value", x ="", y = "", 
+           title = "Heatmap of mean raw p-values")
+  }
+
+# Heatmap of the proportion of replications with p-values < 0.05
+dna_sims_pval %>%
+  map(~as.data.frame(as.table(.x$p.value.matrix))%>%
+        mutate(Freq = ifelse(Var1==Var2, NA, Freq)))%>%
+  reduce(bind_rows, .id = "R")%>%
+  group_by(Var1, Var2)%>%
+  summarise(mean_typeI = mean(Freq < 0.05, na.rm = TRUE), 
+            .groups = "drop")%>%
+  {
+    ggplot(., aes(Var1, Var2, fill = mean_typeI)) +
+      geom_tile() +
+      scale_fill_viridis_c(option = "C", direction = -1) +
+      theme_minimal() +
+      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+      labs(fill = "Proportion of replications \nwith p-values < 0.05", x ="", y = "", 
+           title = "Heatmap of the proportion of replications with p-values < 0.05")
+  }
+```
+
+\newpage
+
+# Simulate continuous variables 
 
 **Example 1**
 
 We generate a simple example. 
 
 * Sample size: $n = 1000$
-* Number of RNA pathways: $p_R = 3$
+* Number of RNA pathways: $p = 3$
 * Correlation matrix: 
 
-$$\Sigma_R = \left(
+$$\Sigma = \left(
 \begin{array}{ccc}
 \text{1} & \text{0} & \text{0.2} \\
 \text{0} & \text{1} & \text{0.5} \\
@@ -209,15 +337,15 @@ Sigma <- matrix(c(1,   0,   0.2,
                   0.2, -0.5, 1), 
                 3, 3)
 # Inspect the matrix 
-colnames(Sigma) <- paste0("R",1:p)
-rownames(Sigma) <- paste0("R",1:p)
+colnames(Sigma) <- paste0("X",1:p)
+rownames(Sigma) <- paste0("X",1:p)
 Sigma %>% 
   as.data.frame()%>%
     tibble::rownames_to_column("var1")%>%
     pivot_longer(-var1, names_to = "var2")%>%
     mutate(value = ifelse(var1==var2, NA, value),
-           var1 = factor(var1, levels = paste0("R",1:p)),
-           var2 = factor(var2, levels = paste0("R",1:p)))%>%
+           var1 = factor(var1, levels = paste0("X",1:p)),
+           var2 = factor(var2, levels = paste0("X",1:p)))%>%
     {
       ggplot(., aes(var1, var2, fill = value)) +
         geom_tile() +
@@ -242,8 +370,8 @@ as.data.frame(cor(rna1))%>%
   tibble::rownames_to_column("var1")%>%
   pivot_longer(-var1, names_to = "var2")%>%
   mutate(value = ifelse(var1==var2, NA, value),
-         var1 = factor(var1, levels = paste0("R",1:20)),
-         var2 = factor(var2, levels = paste0("R",1:20)))%>%
+         var1 = factor(var1, levels = paste0("X",1:20)),
+         var2 = factor(var2, levels = paste0("X",1:20)))%>%
   {
     ggplot(., aes(var1, var2, fill = value)) +
       geom_tile() +
@@ -263,11 +391,11 @@ as.data.frame(cor(rna1))%>%
 We simulate correlated variables grouped into blocks.
 
 * Sample size: $n = 1000$
-* Number of RNA pathways $p_R = 20$
-* Block size: $b_R = 5$
-* Number of blocks: $K_R = 4$
-* Within-block correlations: $\rho_{R;k1} = 0.7, \quad \rho_{R;k2} = -0.2, \quad \rho_{R;k3} = 0.5, \quad \rho_{R;k4} = 0.1$
-* Between-block correlation: $\rho_{B_R} = 0.05$
+* Number of RNA pathways $p = 20$
+* Block size: $b = 5$
+* Number of blocks: $K = 4$
+* Within-block correlations: $\rho_{k1} = 0.7, \quad \rho_{k2} = -0.2, \quad \rho_{k3} = 0.5, \quad \rho_{k4} = 0.1$
+* Between-block correlation: $\rho_{B} = 0.05$
 
 ```{r}
 set.seed(2026)
@@ -279,15 +407,15 @@ Sigma <- generate_block_corr(p,
                              rho_within = c(0.7, -0.2, 0.5, 0.1), 
                              rho_between = 0.05)
 # Inspect the matrix 
-colnames(Sigma) <- paste0("R",1:20)
-rownames(Sigma) <- paste0("R",1:20)
+colnames(Sigma) <- paste0("X",1:20)
+rownames(Sigma) <- paste0("X",1:20)
 Sigma %>% 
   as.data.frame()%>%
     tibble::rownames_to_column("var1")%>%
     pivot_longer(-var1, names_to = "var2")%>%
     mutate(value = ifelse(var1==var2, NA, value),
-           var1 = factor(var1, levels = paste0("R",1:20)),
-           var2 = factor(var2, levels = paste0("R",1:20)))%>%
+           var1 = factor(var1, levels = paste0("X",1:20)),
+           var2 = factor(var2, levels = paste0("X",1:20)))%>%
     {
       ggplot(., aes(var1, var2, fill = value)) +
         geom_tile() +
@@ -313,8 +441,8 @@ as.data.frame(cor(rna_block))%>%
   tibble::rownames_to_column("var1")%>%
   pivot_longer(-var1, names_to = "var2")%>%
   mutate(value = ifelse(var1==var2, NA, value),
-         var1 = factor(var1, levels = paste0("R",1:20)),
-         var2 = factor(var2, levels = paste0("R",1:20)))%>%
+         var1 = factor(var1, levels = paste0("X",1:20)),
+         var2 = factor(var2, levels = paste0("X",1:20)))%>%
   {
     ggplot(., aes(var1, var2, fill = value)) +
       geom_tile() +
@@ -327,311 +455,23 @@ as.data.frame(cor(rna_block))%>%
   }
 ```
 
-# Aalen model 
+----------------------------------------------------
 
-$$\lambda(t|x)=\lambda_0+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3}+\beta_{4}X_{4}$$
-where:
-
-* $\lambda_0=0.05$ (constant baseline hazard)
-* $\beta = (0.06, 0.02, 0.005, 0)$ 
-* $X_{1}, X_{2}$ are binary covariates with $\pi_{1}=0.4$ and $\pi_{2}=0.1$
-* $X_{3}, X_{4}$ are continuous (GSVA-like) covariates 
-
-```{r}
-# Set seed for reproducibility 
-set.seed(2026)
-
-# Sample size 
-n <- 5000
-
-# Generate covariates
-p <- 4
-Sigma <- matrix(c(1, 0, 0, 0,
-                  0, 1, 0, 0,
-                  0, 0, 1, 0,
-                  0, 0, 0, 1), 
-                p, p)
-# prev <- c(0.005, 0.02, 0.05, 0.20)
-prev <- rep(0.5, 4)
-X <- simulate_dna_pathways(n, prev, Sigma)
-# beta <- c(0.06, 0.02, 0.005, 0)  
-beta <- c(0.08, 0.02, 0.04, 0) 
-lambda0 <- 0.05
-censor_max <- calibrate_censor_max_aalen(lambda0 = lambda0,
-                                         beta = beta,
-                                         prev = prev,
-                                         target_cens = 0.01, 
-                                         seed = 2026)
-data <- simulate_aalen_time(X, lambda0, beta, censor_max)
-
-# Censoring rate 
-mean(1 - data$event)
-
-# Kaplan-Meier 
-gtsummary::tbl_survfit(survfit(Surv(time, event)~1, data), 
-                       probs = c(0.25, 0.5, 0.75))%>%
-  gtsummary::add_n()%>%
-  gtsummary::add_nevent()
-ggsurvplot(survfit(Surv(time, event)~1, data), data)
-par(mfrow=c(2,2))
-ggsurvplot(survfit(Surv(time, event)~D1, data), data)
-ggsurvplot(survfit(Surv(time, event)~D2, data), data)
-ggsurvplot(survfit(Surv(time, event)~D3, data), data)
-ggsurvplot(survfit(Surv(time, event)~D4, data), data)
-
-# Fit the Aalen model
-# All components of the model have nonparametric time-varying effects.
-aalen_fit <- timereg::aalen(Surv(time, event)~D1+D2+D3+D4, data = data)
-summary(aalen_fit)
-
-# Coefficients
-# cum <- aalen_fit$cum
-# tmax <- max(cum[, "time"])
-# B_at_tmax <- cum[nrow(cum), -c(1,2)]
-# est_beta <- as.vector(B_at_tmax / tmax)
-# est_beta
-  
-# Plot the non-parametric cumulative regression coefficients with 95% CI
-par(mfrow=c(1,5))
-plot(aalen_fit, ylim = c(-0.5,4))
-
-# Fit the model with the effect of R2 being constant
-aalen_fit2 <- timereg::aalen(Surv(time, event)~D1+D2+D3+const(D4), data = data)
-summary(aalen_fit2)
-par(mfrow=c(1,4))
-plot(aalen_fit2, ylim = c(-0.5,4))
-```
-
-```{r}
-R <- 100
-test_aalen <- replicate(R, {
-  X <- simulate_dna_pathways(n = 1000, prev, Sigma)
-  data <- simulate_aalen_time(X, lambda0, beta, censor_max)
-  #'For constant effects: cumulative coefficient B_j(t) ≈ beta_j * t.
-  #'Approximate beta_j by B_j(t_max) / t_max using the last available 
-  #'cumulative estimate.
-  #'timereg stores cumulative estimates in fit_obj$cum: matrix with columns 
-  #'(time, (coef, se) per covariate).
-  fit_obj <- timereg::aalen(Surv(time, event)~D1+D2+D3+D4, data)
-  cum <- fit_obj$cum
-  tmax <- max(cum[, "time"])
-  B_at_tmax <- cum[nrow(cum), -c(1,2)]
-  est_beta <- as.vector(B_at_tmax / tmax)
-  
-  data.frame(
-    prev_D1   = mean(data$D1),
-    prev_D2   = mean(data$D2),
-    prev_D3   = mean(data$D3),
-    prev_D4   = mean(data$D4),
-    cens_rate = mean(1 - data$event),
-    beta_D1   = est_beta[1],
-    beta_D2   = est_beta[2],
-    beta_D3   = est_beta[3],
-    beta_D4   = est_beta[4]
-    )}, simplify = F)
-
-colMeans(bind_rows(test_aalen))
-```
-
-# Cox-Aalen model
-
-```{r}
-# Set seed for reproducibility 
-set.seed(2026)
-
-# Sample size 
-n <- 1000
-
-# Generate covariates
-p <- 2
-prev <- c(0.2, 0.5)
-Sigma <- matrix(c(1, 0,
-                  0, 1), 
-                p, p)
-X_D <- simulate_dna_pathways(n, prev, Sigma)
-X_R <- simulate_rna_pathways(n, p, mu = 0, Sigma)
-X <- cbind(X_D, X_R)
-
-# Generate time to event data
-beta_add <- c(0, 0.04)  
-beta_mult <- c(0.7, 0)
-lambda0 <- 0.05
-cens_rate <- 0.05
-hazard_i <- lambda0 * exp(drop(as.matrix(X_D) %*% beta_mult))+
-  drop(as.matrix(X_R) %*% beta_add)
-hazard_i <- pmax(hazard_i, 1e-6)
-T <- rexp(n, rate = hazard_i)
-C <- rexp(n, rate = cens_rate)
-time <- pmin(T, C)
-event <- as.integer(T<=C)
-data <- data.frame(time, event, X_D, X_R)
-
-# Fit Cox Aalen model
-cox_aalen_fit <- timereg::cox.aalen(
-  Surv(time, event)~prop(D1)+prop(D2)+R1+R2, 
-  data)
-summary(cox_aalen_fit)
-
-# Proportional excess terms of model 
-cox(cox_aalen_fit)
-par(mfrow=c(1,2))
-plot(cox_aalen_fit,score= TRUE) 
-
-# Plot additive Aalen terms
-par(mfrow = c(1,3))
-plot(cox_aalen_fit, ylim = c(-0.5,5))
-
-# Allow some additive terms to be time-constant 
-cox_aalen_fit2 <- timereg::cox.aalen(
-  Surv(time, event)~prop(D1)+prop(D2)+const(R1)+R2, 
-  data, robust = TRUE)
-summary(cox_aalen_fit2)
-
-# Proportional excess terms of model 
-cox(cox_aalen_fit2)
-par(mfrow=c(1,2))
-plot(cox_aalen_fit2,score= TRUE) 
-
-# Plot additive Aalen terms
-par(mfrow = c(1,3))
-plot(cox_aalen_fit2, ylim = c(-0.5, 5)) 
-```
-
-# Simulations
-
-All simulations were repeated across $B=1000$ replications. 
-
-## DNA pathways 
-
-For each replicate, pairwise associations between DNA-based pathways were tested using Fisher's exact test, and the empirical type I error was estimated as the proportion of replications with p-values below the nominal significance level ($\alpha=0.05$)
-
-We simulate correlated variables grouped into blocks.
-
-* Sample size: $n = 1000$
-* Number of DNA pathways: $p_D = 20$
-* Prevalence of DNA pathways: $\pi_{p_D} \sim \mathcal{U}(0.1, 0.6)$
-* Block size: $b_D = 5$
-* Number of blocks: $K_D = 4$
-* Within-block correlations: $\rho_{D;k1} = 0.6, \quad \rho_{D;k2} = 0.5, \quad \rho_{D;k3} = 0.4, \quad \rho_{D;k4} = 0.05$
-* Between-block correlation: $\rho_{B_D} = 0.01$
-
-```{r eval=FALSE}
-set.seed(2026)
-B <- 1000
-n <- 1000
-p <- 20
-prev <- runif(p, 0.1, 0.6) %>%
-  set_names(paste0("D",1:p))
-Sigma <- generate_block_corr(p, 
-                             block_size = 5, 
-                             rho_within = c(0.6, 0.5, 0.4, 0.05),
-                             rho_between = 0.01)
-
-# Inspect the matrix 
-colnames(Sigma) <- paste0("D",1:20)
-rownames(Sigma) <- paste0("D",1:20)
-Sigma %>% 
-  as.data.frame()%>%
-    tibble::rownames_to_column("var1")%>%
-    pivot_longer(-var1, names_to = "var2")%>%
-    mutate(value = ifelse(var1==var2, NA, value),
-           var1 = factor(var1, levels = paste0("D",1:20)),
-           var2 = factor(var2, levels = paste0("D",1:20)))%>%
-    {
-      ggplot(., aes(var1, var2, fill = value)) +
-        geom_tile() +
-        scale_fill_distiller(palette = "RdBu", direction = -1, 
-                             limits = c(-1,1)) +
-        theme_minimal() +
-        theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-        labs(fill = "Correlation coefficient", x ="", y = "", 
-             title = "True correlation matrix in the simulation design")
-    }
-
-# Run simulations
-dna_sims <- replicate(B,
-                      simulate_dna_pathways(n, prev, Sigma),
-                      simplify = FALSE) %>%
-  imap(~ mutate(.x, B = .y)) %>%
-  bind_rows()
-
-# Prevalence bias 
-dna_sims %>%
-  bind_rows()%>%
-  pivot_longer(-B, names_to = "pathway", values_to = "est_prev") %>%
-  dplyr::full_join(rownames_to_column(data.frame(true_prev = prev), 
-                                      "pathway"), by ="pathway")%>%
-  group_by(pathway) %>%
-  summarize(bias = estimate_bias(true = true_prev, est = est_prev),
-            pathway = factor(pathway, levels = paste0("D", 1:20)),
-            .groups = "drop")%>%
-  {
-    ggplot(., aes(x = pathway, y = bias, colour = pathway))+
-      geom_point(aes(fill = "pathway"))+
-      geom_hline(yintercept = 0, linetype = "dashed")+
-      scale_y_continuous(limits = c(-0.05, 0.05))+
-      labs(x = "Pathway", y = "Bias", title = "Prevalence bias")+
-      theme_minimal()+
-      theme(legend.position = "none")
-  }
-
-# Type I error 
-dna_sims_pval <- dna_sims %>%
-  group_split(B) %>%
-  map(~.x %>% 
-        dplyr::select(-B)%>%
-        pairwise_fisher(vars = names(.)))
-
-# Heatmap of mean raw p-values
-dna_sims_pval %>%
-  map(~as.data.frame(as.table(.x$p.value.matrix))%>%
-        mutate(Freq = ifelse(Var1==Var2, NA, Freq)))%>%
-  reduce(bind_rows, .id = "B")%>%
-  group_by(Var1, Var2)%>%
-  summarise(mean_p.value = mean(Freq), .groups = "drop")%>%
-  {
-    ggplot(., aes(Var1, Var2, fill = mean_p.value)) +
-      geom_tile() +
-      scale_fill_viridis_c(option = "C", direction = -1) +
-      theme_minimal() +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-      labs(fill = "Mean raw p-value", x ="", y = "", 
-           title = "Heatmap of mean raw p-values")
-  }
-
-# Heatmap of the proportion of replications with p-values < 0.05
-dna_sims_pval %>%
-  map(~as.data.frame(as.table(.x$p.value.matrix))%>%
-        mutate(Freq = ifelse(Var1==Var2, NA, Freq)))%>%
-  reduce(bind_rows, .id = "B")%>%
-  group_by(Var1, Var2)%>%
-  summarise(mean_typeI = mean(Freq < 0.05, na.rm = TRUE), 
-            .groups = "drop")%>%
-  {
-    ggplot(., aes(Var1, Var2, fill = mean_typeI)) +
-      geom_tile() +
-      scale_fill_viridis_c(option = "C", direction = -1) +
-      theme_minimal() +
-      theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
-      labs(fill = "Proportion of replications \nwith p-values < 0.05", x ="", y = "", 
-           title = "Heatmap of the proportion of replications with p-values < 0.05")
-  }
-```
-
-## RNA pathways 
+All simulations were repeated across $R=100$ replications. 
 
 For each pathway, we computed the empirical mean, variance, and pairwise correlation coefficients of the RNA pathways across simulation replicates. 
 Mean, variance and correlation coefficients were averaged across replicates. 
 
 * Sample size: $n = 1000$
-* Number of RNA pathways $p_R = 20$
-* Block size: $b_R = 5$
-* Number of blocks: $K_R = 4$
-* Within-block correlations: $\rho_{R;k1} = 0.7, \quad \rho_{R;k2} = -0.2, \quad \rho_{R;k3} = 0.5, \quad \rho_{R;k4} = 0.3$
-* Between-block correlation: $\rho_{B_R} = 0.1$
+* Number of RNA pathways $p = 20$
+* Block size: $b = 5$
+* Number of blocks: $K = 4$
+* Within-block correlations: $\rho_{k1} = 0.7, \quad \rho_{k2} = -0.2, \quad \rho_{k3} = 0.5, \quad \rho_{k4} = 0.3$
+* Between-block correlation: $\rho_{B} = 0.1$
 
-```{r eval=FALSE}
+```{r}
 set.seed(2026)
+R <- 1000
 p <- 20 
 mu <- 0
 
@@ -640,11 +480,11 @@ Sigma <- generate_block_corr(p,
                              block_size = 5, 
                              rho_within = c(0.7, -0.2, 0.5, 0.3), 
                              rho_between = 0.1)
-colnames(Sigma) <- paste0("R",1:20)
-rownames(Sigma) <- paste0("R",1:20)
+colnames(Sigma) <- paste0("X",1:20)
+rownames(Sigma) <- paste0("X",1:20)
 
 # Run simulations 
-rna_sims <- replicate(B,
+rna_sims <- replicate(R,
                       simulate_rna_pathways(n, p, mu, Sigma),
                       simplify = FALSE)
 
@@ -680,10 +520,6 @@ rna_sims %>%
       theme_minimal()+
       theme(legend.position = "none")
   }
-```
-
-```{r eval=FALSE}
-#| layout-nrow: 2
 
 # True correlation matrix 
 Sigma %>% 
@@ -691,8 +527,8 @@ Sigma %>%
     tibble::rownames_to_column("var1")%>%
     pivot_longer(-var1, names_to = "var2")%>%
     mutate(value = ifelse(var1==var2, NA, value),
-           var1 = factor(var1, levels = paste0("R",1:20)),
-           var2 = factor(var2, levels = paste0("R",1:20)))%>%
+           var1 = factor(var1, levels = paste0("X",1:20)),
+           var2 = factor(var2, levels = paste0("X",1:20)))%>%
     {
       ggplot(., aes(var1, var2, fill = value)) +
         geom_tile() +
@@ -713,8 +549,8 @@ as.data.frame(cor_sims_rna)%>%
   tibble::rownames_to_column("var1")%>%
   pivot_longer(-var1, names_to = "var2")%>%
   mutate(value = ifelse(var1==var2, NA, value),
-         var1 = factor(var1, levels = paste0("R",1:20)),
-         var2 = factor(var2, levels = paste0("R",1:20)))%>%
+         var1 = factor(var1, levels = paste0("X",1:20)),
+         var2 = factor(var2, levels = paste0("X",1:20)))%>%
   {
     ggplot(., aes(var1, var2, fill = value)) +
       geom_tile() +
@@ -726,3 +562,245 @@ as.data.frame(cor_sims_rna)%>%
            title = "Average correlation matrix across simulation replicates")
   }
 ```
+
+\newpage
+
+# Simulate time-to-event data
+
+## Aalen additive model 
+
+Four binary covariates were generated *independently* with prevalences spanning 
+rare to frequent alterations, $X_j \sim Bernoulli(\pi_j)$ with 
+$\pi_j =(0.005, 0.02, 0.05, 0.20)$. 
+
+Events times were simulated under the following time-constant additive hazards 
+model: 
+
+$$\lambda(t|x)=\lambda_0+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3}+\beta_{4}X_{4}$$
+with $\lambda_0=0.05$ and $\beta=(0.06, 0.02, 0.005, 0)$. 
+
+Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
+parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
+data-generating mechanism to achieve an expected censoring proportion of 
+approximately 5%, and the calibrated value was then fixed across all 
+simulation replicates. 
+
+```{r}
+# Set seed for reproducibility 
+set.seed(2026)
+
+# Generate data
+n <- 1000
+p <- 4
+sigma <- diag(x = 1, nrow = p, ncol = p)
+prev <- c(0.005, 0.02, 0.05, 0.20)
+beta <- c(0.06, 0.02, 0.005, 0)
+lambda0 <- 0.05
+target_cens <- 0.05
+c_max <- calibrate_c_max_aalen(lambda0     = lambda0,
+                               beta        = beta,
+                               prev        = prev, 
+                               sigma       = sigma,
+                               target_cens = target_cens,
+                               seed        = 2026)
+c_max
+data <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
+head(data)
+
+# Check prevalences
+colMeans(data %>% dplyr::select(starts_with("X")))
+
+# Check censoring rate 
+mean(1 - data$event)
+
+# Kaplan-Meier 
+km_aalen_fit <- survfit(Surv(time, event)~1, data)
+km_aalen_fit
+ggsurvplot(km_aalen_fit, data = data, legend = "none")
+ggsurvplot(survfit(Surv(time, event)~X1, data), data)
+ggsurvplot(survfit(Surv(time, event)~X2, data), data)
+ggsurvplot(survfit(Surv(time, event)~X3, data), data)
+ggsurvplot(survfit(Surv(time, event)~X4, data), data)
+
+# Fit the Aalen model
+# All components of the model have nonparametric time-varying effects.
+aalen_fit <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data = data)
+summary(aalen_fit)
+
+# Coefficients
+# cum <- aalen_fit$cum
+# tmax <- max(cum[, "time"])
+# B_at_tmax <- cum[nrow(cum), -c(1,2)]
+# est_beta <- as.vector(B_at_tmax / tmax)
+# est_beta
+  
+# Plot the non-parametric cumulative regression coefficients with 95% CI
+# par(mfrow=c(1,2))
+plot(aalen_fit, ylim = c(-0.5,4))
+
+# Fit the model with the effect of X3 and X4 being constant
+aalen_fit2 <- timereg::aalen(Surv(time, event)~
+                               X1+X2+const(X3)+const(X4), 
+                             data = data)
+summary(aalen_fit2)
+# par(mfrow=c(1,2))
+plot(aalen_fit2, ylim = c(-0.5,4))
+
+# Fit the model with only time-constant effects 
+aalen_fit3 <- timereg::aalen(Surv(time, event)~
+                               const(X1)+const(X2)+const(X3)+const(X4), 
+                             data = data)
+summary(aalen_fit3)
+plot(aalen_fit3, ylim = c(-0.5,4))
+```
+
+```{r}
+R <- 1000
+test_aalen <- replicate(R, {
+  data <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
+  #'For constant effects: cumulative coefficient B_j(t) ≈ beta_j * t.
+  #'Approximate beta_j by B_j(t_max) / t_max using the last available 
+  #'cumulative estimate.
+  #'timereg stores cumulative estimates in fit_obj$cum: matrix with columns 
+  #'(time, (coef, se) per covariate).
+  fit_obj <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data)
+  cum <- fit_obj$cum
+  tmax <- max(cum[, "time"])
+  B_at_tmax <- cum[nrow(cum), -c(1,2)]
+  est_beta <- as.vector(B_at_tmax / tmax)
+  
+  data.frame(
+    prev_X1   = mean(data$X1),
+    prev_X2   = mean(data$X2),
+    prev_X3   = mean(data$X3),
+    prev_X4   = mean(data$X4),
+    cens_rate = mean(1 - data$event),
+    beta_X1   = est_beta[1],
+    beta_X2   = est_beta[2],
+    beta_X3   = est_beta[3],
+    beta_X4   = est_beta[4]
+    )}, simplify = F)
+
+colMeans(bind_rows(test_aalen))
+```
+
+## Cox-Aalen model
+
+The covariates are generated *independently* as follows:
+
+$X = (X_{1}, X_{2}, X_{3}, X_{4})$ 
+
+where
+  
+* $X_{1} \sim \mathcal{B}(0.4)$
+* $X_{2} \sim \mathcal{B}(0.4)$
+* $X_{3} \sim \mathcal{B}(0.4)$
+* $X_{4} \sim \mathcal{N}(0,1)$
+
+To generate mixed additive and multiplicative effects, event times were 
+simulated under a Cox-Aalen model with constant baseline hazard: 
+$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$ and $X_2$ with 
+coefficients $\beta_{1}=0.06$ and $\beta_{3}=0.005$, respectively. 
+Multiplicative (proportional hazards) effects were assigned to 
+$X_3$ and $X_4$ with coefficents $\beta_{2}=0.5$ and
+$\beta_{4}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
+
+```{r}
+# Set seed for reproducibility 
+set.seed(2026)
+
+# Generate data
+n <- 1000
+prev_add <- c(0.4, 0.4)
+sigma_add <- diag(x = 1, nrow = 2, ncol = 2)
+beta_add <- c(0.06, 0.005)
+prev_mult <- 0.4
+sigma_mult_bin <- diag(x = 1, nrow = 1, ncol = 1)
+mean_mult <- 0
+sigma_mult_cont <- diag(x = 1, nrow = 1, ncol = 1)
+beta_mult <- c(0.5, 0.2)
+lambda0 <- 0.05
+target_cens <- 0.05
+c_max <- calibrate_c_max_cox_aalen(lambda0         = lambda0,
+                                   beta_add        = beta_add,
+                                   beta_mult       = beta_mult,
+                                   prev_add        = prev_add,
+                                   sigma_add       = sigma_add,
+                                   prev_mult       = prev_mult,
+                                   mean_mult       = mean_mult,
+                                   sigma_mult_bin  = sigma_mult_bin,
+                                   sigma_mult_cont = sigma_mult_cont,
+                                   target_cens     = target_cens,
+                                   seed            = 2026)
+c_max
+data <- simulate_cox_aalen_data(n, lambda0, beta_add, beta_mult,
+                                prev_add, sigma_add,
+                                prev_mult, mean_mult,
+                                sigma_mult_bin, sigma_mult_cont,
+                                c_max)
+head(data)
+
+# Check prevalences / mean 
+colMeans(data %>% dplyr::select(starts_with("X")))
+
+# Check censoring rate 
+mean(1 - data$event)
+
+# Kaplan-Meier
+km_cox_aalen_fit <- survfit(Surv(time, event)~1, data)
+km_cox_aalen_fit
+ggsurvplot(km_cox_aalen_fit, data = data, legend = "none")
+ggsurvplot(survfit(Surv(time, event)~X1, data), data)
+ggsurvplot(survfit(Surv(time, event)~X2, data), data)
+ggsurvplot(survfit(Surv(time, event)~X3, data), data)
+
+# Fit Cox-Aalen model 
+cox_aalen_fit <- timereg::cox.aalen(
+  Surv(time, event)~X1+X2+prop(X3)+prop(X4), 
+  data)
+summary(cox_aalen_fit)
+
+# Plot additive Aalen terms
+# par(mfrow = c(1,2))
+plot(cox_aalen_fit, ylim = c(-0.5,5))
+
+# Allow X2 to be time-constant 
+cox_aalen_fit2 <- timereg::cox.aalen(
+  Surv(time, event)~X1+const(X2)+prop(X3)+prop(X4), 
+  data, robust = TRUE)
+summary(cox_aalen_fit2)
+
+# Proportional excess terms of model 
+cox(cox_aalen_fit2)
+# par(mfrow=c(1,2))
+plot(cox_aalen_fit2,score= TRUE) 
+
+# Plot additive Aalen terms
+# par(mfrow = c(1,2))
+plot(cox_aalen_fit2, ylim = c(-0.5, 5)) 
+```
+```{r}
+R <- 1000
+test_cox_aalen <- replicate(R, {
+  data <- simulate_cox_aalen_data(n, lambda0, beta_add, beta_mult,
+                                  prev_add, sigma_add,
+                                  prev_mult, mean_mult,
+                                  sigma_mult_bin, sigma_mult_cont,
+                                  c_max)
+  cox_aalen_fit <- timereg::cox.aalen(
+    Surv(time, event)~X1+X2+prop(X3)+prop(X4),
+    data = data)
+  coef <- data.frame(coef(cox_aalen_fit))
+  data.frame(
+    prev_X1   = mean(data$X1),
+    prev_X2   = mean(data$X2),
+    prev_X3   = mean(data$X3),
+    mean_X4   = mean(data$X4),
+    cens_rate = mean(1 - data$event),
+    beta_X3   = coef[1, "Coef."],
+    beta_X4   = coef[2, "Coef."]
+    )}, simplify = F)
+
+colMeans(bind_rows(test_cox_aalen))
+```
+

@@ -191,8 +191,7 @@ For each individual $i = 1, \dots, n$, with covariate vector
 $\mathbf{X}_i$, the hazard function was defined as
 
 $$
-\lambda(t \mid \mathbf{X}_i) 
-= \lambda_0(t) + \mathbf{X}_i^\top \boldsymbol{\beta},
+\lambda(t \mid \mathbf{X}_i) = \lambda_0(t) + \mathbf{X}_i^\top \boldsymbol{\beta},
 $$
 
 where $\lambda_0(t)$ denotes the baseline hazard function and 
@@ -204,9 +203,9 @@ To evaluate performance under mixed hazard structures, we additionally
 generated data from a Cox-Aalen model:
 
 $$
-\lambda(t|X_{add},X_{mult})=\lambda_0 
-\exp(X_{i,mult}^\top\beta_{mult})+X_{i,add} ^\top\beta_{add}.
+\lambda(t|X_{add},X_{mult})=\lambda_0 \exp(X_{i,mult}^\top\beta_{mult})+X_{i,add} ^\top\beta_{add}.
 $$
+
 where:
 
 * $X_{mult}$ are covariates with multiplicative effects, 
@@ -219,8 +218,7 @@ where:
 We considered two estimators of variable importance, targeting distinct 
 estimands: exclusion importance and permutation importance.  
 
-### Model-agnostic framework for exclusion-based variable importance in survival 
-analysis 
+### Model-agnostic framework for exclusion-based variable importance in survival analysis 
 
 **Definition**
 

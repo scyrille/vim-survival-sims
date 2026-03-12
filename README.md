@@ -2,23 +2,47 @@
 
 ## Introduction
 
-We conducted a simulation study to examine the behavior of Wolock’s model-agnostic exclusion variable importance measure (VIM) under a range of survival data-generating mechanisms. The objectives were to evaluate its performance and inferential validity under additive hazards, mixed additive–multiplicative hazards, and proportional hazards settings, including high-dimensional scenarios with rare binary covariates and heterogeneous effect sizes. We also compared alternative strategies for nuisance function estimation and contrasted exclusion-based importance with permutation-based importance across all scenarios.
+We conducted a simulation study to examine the behavior of Wolock’s 
+model-agnostic exclusion variable importance measure (VIM) under a range of 
+survival data-generating mechanisms. The objectives were to evaluate its 
+performance and inferential validity under additive hazards, mixed 
+additive–multiplicative hazards, and proportional hazards settings, including 
+high-dimensional scenarios with rare binary covariates and heterogeneous effect 
+sizes. We also compared alternative strategies for nuisance function estimation 
+and contrasted exclusion-based importance with permutation-based importance 
+across all scenarios.
 
 ## Objectives
 
-The simulation study was designed to evaluate the performance, robustness, and inferential validity of Wolock’s model-agnostic exclusion variable importance measure (VIM) across several survival data-generating mechanisms.
+The simulation study was designed to evaluate the performance, robustness, and 
+inferential validity of Wolock’s model-agnostic exclusion variable importance 
+measure (VIM) across several survival data-generating mechanisms.
 
-First, under an **additive hazards framework**, we assess the accuracy and inferential properties of the VIM and compare different strategies for estimating the conditional survival functions, namely ***global survival stacking***, ***survival Super Learner***, the ***Aalen additive hazards model***, and ***random survival forests***.
+First, under an **additive hazards framework**, we assess the accuracy and 
+inferential properties of the VIM and compare different strategies for 
+estimating the conditional survival functions, namely 
+***global survival stacking***, ***survival Super Learner***, the 
+***Aalen additive hazards model***, and ***random survival forests***.
 
-Second, under **mixed additive and multiplicative hazard structures**, we investigate the behavior of the VIM when both types of effects coexist. In this setting, conditional survival functions are estimated using ***global survival stacking***, ***survival Super Learner***, the ***Cox–Aalen model***, and ***random survival forests***.
+Second, under **mixed additive and multiplicative hazard structures**, we 
+investigate the behavior of the VIM when both types of effects coexist. In this 
+setting, conditional survival functions are estimated using 
+***global survival stacking***, ***survival Super Learner***, the 
+***Cox–Aalen model***, and ***random survival forests***.
 
-Third, we assess the sensitivity of the VIM when covariates correspond to **rare alterations** with **heterogeneous effect sizes**, ranging from weak to strong, under a **proportional hazards model**.
+Third, we assess the sensitivity of the VIM when covariates correspond to 
+**rare alterations** with **heterogeneous effect sizes**, ranging from weak to 
+strong, under a **proportional hazards model**.
 
-Finally, we compare **exclusion-based variable importance** with **permutation-based variable importance** to examine differences in interpretation, stability, and empirical performance across the considered scenarios.
+Finally, we compare **exclusion-based variable importance** with 
+**permutation-based variable importance** to examine differences in 
+interpretation, stability, and empirical performance across the considered 
+scenarios.
 
 ## Data-generation mechanisms
 
-We simulated datasets combining DNA alterations and RNA pathway scores for $i = 1, ..., n$ individuals.
+We simulated datasets combining DNA alterations and RNA pathway scores for 
+$i = 1, ..., n$ individuals.
 
 ### DNA data simulation 
 
@@ -62,7 +86,8 @@ t_j = \Phi^{-1}(\pi_j)
 $$
 
 was applied, where $\pi_j$ denotes the marginal alteration prevalence and 
-$\Phi^{-1}$ is the inverse cumulative distribution function of the standard normal distribution. 
+$\Phi^{-1}$ is the inverse cumulative distribution function of the standard 
+normal distribution. 
 The observed binary variable was defined as:
 
 $$
@@ -75,11 +100,13 @@ $$
 \Pr(X_j = 1) = \pi_j.
 $$
 
-This approach guarantees exact control of marginal prevalences while inducing dependence between binary variables through the latent correlation matrix.
+This approach guarantees exact control of marginal prevalences while inducing 
+dependence between binary variables through the latent correlation matrix.
 
 ### RNA data simulation
 
-RNA data were simulated as continuous pathway-level scores to mimic GSVA-like enrichment scores.
+RNA data were simulated as continuous pathway-level scores to mimic GSVA-like 
+enrichment scores.
 
 For each individual $i = 1, \dots, n$,
 
@@ -87,13 +114,16 @@ $$
 \mathbf{X}_i \sim \mathcal{N}(0, \Sigma),
 $$
 
-where $\Sigma \in \mathbb{R}^{p \times p}$ is a block-correlation matrix reflecting biological co-regulation between pathways.
+where $\Sigma \in \mathbb{R}^{p \times p}$ is a block-correlation matrix 
+reflecting biological co-regulation between pathways.
 
-To reproduce GSVA outputs as used in practice, RNA scores were standardized across samples
+To reproduce GSVA outputs as used in practice, RNA scores were standardized 
+across samples
 
 ### Block correlation structure 
 
-Pathways were partitioned into $K = 4$ blocks of equal size $b = 5$ (so $p = 20$).  
+Pathways were partitioned into $K = 4$ blocks of equal size $b = 5$ 
+(so $p = 20$).  
 Let
 
 $$
@@ -117,24 +147,42 @@ $$
 \Sigma_{X,k}=(1-\rho_k) I_b+\rho_k \mathbf{1}_b \mathbf{1}_b^\top,
 $$
 
-where $I_b$ denotes the $b \times b$ identity matrix and $\mathbf{1}_b$ is a $b$-dimensional vector of ones.
+where $I_b$ denotes the $b \times b$ identity matrix and $\mathbf{1}_b$ is a 
+$b$-dimensional vector of ones.
 
-This structure induces strong positive co-regulation in block 1, moderate positive correlation in block 3, weak correlation in block 4, and antagonistic regulation (negative correlation) in block 2, thereby mimicking heterogeneous biological pathway interactions.
+This structure induces strong positive co-regulation in block 1, moderate 
+positive correlation in block 3, weak correlation in block 4, and antagonistic 
+regulation (negative correlation) in block 2, thereby mimicking heterogeneous 
+biological pathway interactions.
 
 ### Simulation of time-to-event outcomes
 
-Let $T$ denote the event time and $C$ an independent censoring time. The observed data consisted of $(Y,\Delta, X, Z)$, where:
+Let $T$ denote the event time and $C$ an independent censoring time. The 
+observed data consisted of $(Y,\Delta, X, Z)$, where:
 
 $$Y=min(T,C), \quad \Delta = \mathbb{I}(T \le C).$$
-Censoring times were generated independently from an exponential distribution to achieve a target censoring proportion.
+Censoring times were generated independently from an exponential distribution 
+to achieve a target censoring proportion.
 
 **Block effects versus pathway-specific effects**
 
-To differentiate structured group-level biological signals from individual pathway-level heterogeneity, two distinct effect structures were considered in the data-generating mechanism: **block effects** and **pathway-specific effects**.
+To differentiate structured group-level biological signals from individual 
+pathway-level heterogeneity, two distinct effect structures were considered in 
+the data-generating mechanism: **block effects** and 
+**pathway-specific effects**.
 
-**Block effects** represent shared signals operating at the level of correlated pathway groups. Pathways were partitioned into predefined blocks reflecting biological co-regulation. Within each block, a common regression coefficient was assigned so that all pathways in the block contributed jointly to the prognostic signal. Under this specification, the effect operates at the group level, inducing a coherent association between correlated pathways and the outcome. 
+**Block effects** represent shared signals operating at the level of correlated 
+pathway groups. Pathways were partitioned into predefined blocks reflecting 
+biological co-regulation. Within each block, a common regression coefficient was 
+assigned so that all pathways in the block contributed jointly to the prognostic 
+signal. Under this specification, the effect operates at the group level, 
+inducing a coherent association between correlated pathways and the outcome. 
 
-**Pathway-specific effects** allow each pathway to contribute independently to the outcome through its own regression coefficient. This formulation permits heterogeneous effect sizes within correlated blocks and enables scenarios in which only a subset of pathways within a block is truly associated with the outcome. 
+**Pathway-specific effects** allow each pathway to contribute independently to 
+the outcome through its own regression coefficient. This formulation permits 
+heterogeneous effect sizes within correlated blocks and enables scenarios in 
+which only a subset of pathways within a block is truly associated with the 
+outcome. 
 
 **Additive Aalen model**
 
@@ -152,9 +200,13 @@ $\boldsymbol{\beta}$ represents the vector of additive hazard effects.
 
 **Cox-Aalen model**
 
-To evaluate performance under mixed hazard structures, we additionally generated data from a Cox-Aalen model:
+To evaluate performance under mixed hazard structures, we additionally 
+generated data from a Cox-Aalen model:
 
-$$\lambda(t|X_{add},X_{mult})=\lambda_0 \exp(X_{i,mult}^\top\beta_{mult})+X_{i,add} ^\top\beta_{add}.$$
+$$
+\lambda(t|X_{add},X_{mult})=\lambda_0 
+\exp(X_{i,mult}^\top\beta_{mult})+X_{i,add} ^\top\beta_{add}.
+$$
 where:
 
 * $X_{mult}$ are covariates with multiplicative effects, 
@@ -164,20 +216,33 @@ where:
 
 ## Target estimands and oracle variable importance 
 
-We considered two estimators of variable importance, targeting distinct estimands: exclusion importance and permutation importance.  
+We considered two estimators of variable importance, targeting distinct 
+estimands: exclusion importance and permutation importance.  
 
-### Model-agnostic framework for exclusion-based variable importance in survival analysis 
+### Model-agnostic framework for exclusion-based variable importance in survival 
+analysis 
 
 **Definition**
 
-We consider the model-agnostic variable importance measure proposed by Wolock *et al.*, defined through covariate exclusion. For a given prediction time $t_0$ and covariate $X_j$, the VIM quantifies the change in predictive performance when $X_j$ is removed from the prediction function. 
+We consider the model-agnostic variable importance measure proposed by Wolock 
+*et al.*, defined through covariate exclusion. For a given prediction time $t_0$ 
+and covariate $X_j$, the VIM quantifies the change in predictive performance 
+when $X_j$ is removed from the prediction function. 
 
-We defined a nonparametric variable importance measure (VIM) based on the predictive value of a pathway set within a flexible survival prediction model fitted with `survML`. Let $V(.)$ denote a time-dependent predictive performance functional, evaluated on predictions. The variable importance measure for covariate $X_j$ at time $t_0$, $\psi_j(t_0)$, was defined as the difference in predictive performance between a model fit using the full feature set, $V_{full}$ and a model fit after excluding the pathway or group of pathways of interest, $V_{reduced}$:
+We defined a nonparametric variable importance measure (VIM) based on the 
+predictive value of a pathway set within a flexible survival prediction model 
+fitted with `survML`. Let $V(.)$ denote a time-dependent predictive performance 
+functional, evaluated on predictions. The variable importance measure for 
+covariate $X_j$ at time $t_0$, $\psi_j(t_0)$, was defined as the difference in 
+predictive performance between a model fit using the full feature set, 
+$V_{full}$ and a model fit after excluding the pathway or group of pathways of 
+interest, $V_{reduced}$:
 $$\psi_j(P_0) = V_{full} - V_{reduced}$$
 
 **Estimation of the conditional survival functions**
 
-We estimated the conditional survival functions $F_0$ and $G_0$ using different strategies, depending on the scenario: 
+We estimated the conditional survival functions $F_0$ and $G_0$ using different 
+strategies, depending on the scenario: 
 
 * Aalen model (`timereg::aalen()`, `pec::predictSurvProb()`)
 * Cox-Aalen survival model (`timereg::cox.aalen()`, `pec::predictSurvProb()`) 
@@ -187,26 +252,38 @@ We estimated the conditional survival functions $F_0$ and $G_0$ using different 
 
 **Estimation of the oracle prediction functions**
 
-We estimated the full and residual oracle prediction functions for time-horizon VIMs, $f_{0}$ and $f_{0,s}$, using Super Learner regression.
+We estimated the full and residual oracle prediction functions for time-horizon 
+VIMs, $f_{0}$ and $f_{0,s}$, using Super Learner regression.
 
-We used the sample splitting procedure to compute VIM point and standard error estimates, from which we computed nominal 95% CI Wald-type confidence intervals. 
+We used the sample splitting procedure to compute VIM point and standard error 
+estimates, from which we computed nominal 95% CI Wald-type confidence intervals. 
 
 ### Permutation variable importance in machine learning survival models 
 
 **Definition**
 
-Permutation VIM measures was calculated using `survex` package using the `model_parts()` function. The importance of $j$-th variable is defined as the change in the loss function $\mathcal{L}$ caused by permutation of this variable in the dataset:
+Permutation VIM measures was calculated using `survex` package using the 
+`model_parts()` function. The importance of $j$-th variable is defined as the 
+change in the loss function $\mathcal{L}$ caused by permutation of this variable 
+in the dataset:
 
 $$
-\mathrm{PFI}_t(f, \mathbf{X}, j, \mathcal{L}, y)= \frac{1}{B} \sum_{i=1}^{B}\left( \mathcal{L}(f, \mathbf{X}, y)- \mathcal{L}(f, \mathbf{X}^{*j}_i, y) \right)
+\mathrm{PFI}_t(f, \mathbf{X}, j, \mathcal{L}, y)= \frac{1}{B} \sum_{i=1}^{B}
+\left( \mathcal{L}(f, \mathbf{X}, y)- 
+\mathcal{L}(f, \mathbf{X}^{*j}_i, y) \right)
 $$
 
-where $\mathcal{L}$ represents the loss function chosen to evaluate model performance, $\mathbf{X}^{*j}_i$ denotes the $i$-th permutation of variable $j$ within the dataset $X$, and $B$ is the number of different permutations. Permuting a variable is supposed to simulate the loss of information associated with the variable.
+where $\mathcal{L}$ represents the loss function chosen to evaluate model 
+performance, $\mathbf{X}^{*j}_i$ denotes the $i$-th permutation of variable $j$ 
+within the dataset $X$, and $B$ is the number of different permutations. 
+Permuting a variable is supposed to simulate the loss of information associated 
+with the variable.
 For `survex`, we used  the `model_parts()` function with 10 permutations.
 
 **Model framework**
 
-We used the following models to calculates variable importance in the loss function after the variable values permutations: 
+We used the following models to calculates variable importance in the loss 
+function after the variable values permutations: 
 
 * Aalen model (`timereg`, `pec`) 
 * Cox-Aalen survival model (`timereg`, `pec`)
@@ -214,33 +291,55 @@ We used the following models to calculates variable importance in the loss funct
 
 ### Time horizon 
 
-Variable importance was evaluated at a two fixed time horizons, corresponding to the **25th** and **75th percentiles** of the empirical observed event times (or the Kaplan-Meier estimator to account for censoring). These represent an early-risk and  a late-risk horizon, respectively. Restricting the analysis to two quantile-based time points reduces computational burden while ensuring that evaluation occurs in regions with a sufficient number of individuals at risk, thereby avoiding instability in the tail of the distribution.
+Variable importance was evaluated at a two fixed time horizons, corresponding to 
+the **25th** and **75th percentiles** of the empirical observed event times (or 
+the Kaplan-Meier estimator to account for censoring). These represent an 
+early-risk and  a late-risk horizon, respectively. Restricting the analysis to 
+two quantile-based time points reduces computational burden while ensuring that 
+evaluation occurs in regions with a sufficient number of individuals at risk, 
+thereby avoiding instability in the tail of the distribution.
 
 ### Performance metrics for variable importance in survival analysis 
 
-Variable importance was evaluated using the *Brier score*, $BS(t)$ to captures both discrimination and calibration. We additionally used the *cumulative/dynamic area under the ROC curve,* $AUC(t)$ to estimate variable importance measures, which evaluate discrimination independently of calibration. 
+Variable importance was evaluated using the *Brier score*, $BS(t)$ to captures 
+both discrimination and calibration. We additionally used the 
+*cumulative/dynamic area under the ROC curve,* $AUC(t)$ to estimate variable 
+importance measures, which evaluate discrimination independently of calibration. 
 
-The ***cumulative/dynamique AUC*** at time $t$ is defined as the probabilitu that, among a randomly selected pair consisting of one individual who experiences the event before $t$ and one who survives beyon $t$, the predicted risk is higher for the former. 
+The ***cumulative/dynamique AUC*** at time $t$ is defined as the probabilitu 
+that, among a randomly selected pair consisting of one individual who experiences 
+the event before $t$ and one who survives beyon $t$, the predicted risk is 
+higher for the former. 
 
-The ***Brier score*** at time $t$ is the expected squared difference between the observed survival status at time $t$ and the predicted survival probability, with inverse probability of censoring weights to account for right censoring. 
+The ***Brier score*** at time $t$ is the expected squared difference between the 
+observed survival status at time $t$ and the predicted survival probability, 
+with inverse probability of censoring weights to account for right censoring. 
 
 ### Cross-validation procedure 
 
-To ensure fair comparison across nuisance estimation strategies, all models were evaluated using the same cross-validation framework.
+To ensure fair comparison across nuisance estimation strategies, all models were 
+evaluated using the same cross-validation framework.
 
-Five-fold cross-validation was employed for out-of-sample performance assessment and to prevent optimistic bias in risk prediction and downstream VIM estimation.
+Five-fold cross-validation was employed for out-of-sample performance assessment
+and to prevent optimistic bias in risk prediction and downstream VIM estimation.
 
-We implemented $K$-fold cross-validation with $K=5$. The data were randomly partitioned into five approximately equal folds. For each fold:
+We implemented $K$-fold cross-validation with $K=5$. The data were randomly 
+partitioned into five approximately equal folds. For each fold:
 
 1. The model was trained on the $K-1$ remaining folds.
-2. Predictions of the conditional survival and hazard functions were obtained for individuals in the held-out fold.
+2. Predictions of the conditional survival and hazard functions were obtained 
+for individuals in the held-out fold.
 3. Performance metrics were computed on the validation fold.
 
-This procedure was repeated so that each observation contributed once to validation risk estimation.
+This procedure was repeated so that each observation contributed once to 
+validation risk estimation.
 
 ### Oracle variable importance  
 
-We generated a large Monte Carlo sample ($n=200 000$) from the true data-generating model to approximate population-level quantities. Using this sample, we computed the oracle predictive performance as well as the oracle VIM measure for each pathway or group of pathways.
+We generated a large Monte Carlo sample ($n=200 000$) from the true 
+data-generating model to approximate population-level quantities. Using this 
+sample, we computed the oracle predictive performance as well as the oracle 
+VIM measure for each pathway or group of pathways.
 
 ## Performance evaluation
 
@@ -286,9 +385,9 @@ $\pi_j =(0.005, 0.02, 0.05, 0.20)$.
 Events times were simulated under the following time-constant additive hazards 
 model: 
 
-$$\lambda(t|x)=\lambda_0+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3}+\beta_{4}X_{4}$$
+$$\lambda(t|x)=\lambda_0+\beta_{1}(t)X_{1}+\beta_{2}(t)X_{2}+\beta_{3}(t)X_{3}+\beta_{4}(t)X_{4}$$
 
-with $\lambda_0=0.05$ and $\beta=(0.06, 0.02, 0.005, 0)$. 
+with $\lambda_0=0.05$ and $\beta_j(t)=(0.06, 0.02, 0.005, 0)$. 
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
@@ -322,24 +421,28 @@ hazard follows a **Cox-Aalen model**.
 
 The covariates are generated *independently* as follows:
 
-* $X = (X_{D_1}, X_{D_2}, X_{R_1}, X_{R_2})$
+* $X = (X_{1}, X_{2}, X_{3}, X_{4})$
 * $X_{1}, X_{2} \sim \mathcal{B}(0.4)$
 * $X_{3}, X_{4} \sim \mathcal{N}(0,1)$
 
 To generate mixed additive and multiplicative effects, event times were 
 simulated under a Cox-Aalen model with constant baseline hazard: 
 $\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$ and $X_3$ with 
-coefficients $\beta_{1}=0.06$ and $\beta_{3}=0.005$, respectively. 
+coefficients $\beta_{1}(t)=0.06$ and $\beta_{3}(t)=0.005$, respectively. 
 Multiplicative (proportional hazards) effects were assigned to 
-$X_2$ and $X_4$ with coefficents $\beta_{2}=0.5$ and
+$X_2$ and $X_4$ with coefficients $\beta_{2}=0.5$ and
 $\beta_{4}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
 
-Censoring times were generated independently to yield approximately 20-25%
-right censoring.
+Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
+parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
+data-generating mechanism to achieve an expected censoring proportion of 
+approximately 20%, and the calibrated value was then fixed across all 
+simulation replicates. 
 
 **Nuisance functions estimators to compare**
 
-We compare the following approaches for estimating the nuisance functions required for VIM computation:
+We compare the following approaches for estimating the nuisance functions 
+required for VIM computation:
 
 * Cox-Aalen model (`timereg::cox.aalen`)
 * Survival Super Learner (`survSuperLearner`)
@@ -353,7 +456,7 @@ This scenario is designed to evaluate the sensitivity of the exclusion
 variable importance measure (VIM) in high-dimensional binary setting mimicking genomic data. We consider ***rare alterations*** with ***heterogeneous effect sizes (from weak to strong)*** under a ***proportional hazards model***. 
 The goal is to assess whether VIM can:
 
-1. detect rare but strongly pronostic alterations 
+1. detect rare but strongly prognostic alterations 
 2. distinguish weak from strong signals
 3. correctly identify null variables 
 
@@ -370,8 +473,11 @@ The event times follows a Cox model with a with constant baseline hazard $\lambd
 * Weak effects: $\beta_j = log(1.2)$
 * Null effects:  $\beta_j = 0$
 
-Censoring times were generated independently to yield approximately 20-25%
-right censoring.
+Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
+parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
+data-generating mechanism to achieve an expected censoring proportion of 
+approximately 20%, and the calibrated value was then fixed across all 
+simulation replicates. 
 
 We vary:
 
@@ -381,13 +487,20 @@ We vary:
 
 ### Sensitivity to covariate correlations 
 
-For each scenario, we additionally evaluated the sensitivity of the VIM to correlations between covariates. Correlations were introduced between selected covariates while preserving their marginal distributions (binary or continuous). Specifically, we considered both weak and moderate correlation dependence between predictors, with pairwise correlations set to $\rho=0.3$ and $\rho=0.6$, respectively. This analysis allows us to assess the robustness of the estimated VIM in the presence of correlated covariates. 
+For each scenario, we additionally evaluated the sensitivity of the VIM to 
+correlations between covariates. Correlations were introduced between selected 
+covariates while preserving their marginal distributions (binary or continuous). 
+Specifically, we considered both weak and moderate correlation dependence 
+between predictors, with pairwise correlations set to $\rho=0.3$ and $\rho=0.6$, 
+respectively. This analysis allows us to assess the robustness of the estimated 
+VIM in the presence of correlated covariates. 
 
 ### Compare exclusion variable importance to permutation variable importance
 
 **Objective**
 
-To examine differences in interpretation, stability, and empirical performance across the considered scenarios.
+To examine differences in interpretation, stability, and empirical performance 
+across the considered scenarios.
 
 **Scenarios**
 
@@ -397,7 +510,9 @@ To examine differences in interpretation, stability, and empirical performance a
 
 ### True values of variable importance for all scenarios 
 
-The approximate true values of variable importance based on Brier score, and AUC(t) under all scenarios considered here are provided in Table X (to be completed). 
+The approximate true values of variable importance based on Brier score, and 
+AUC(t) under all scenarios considered here are provided in Table X 
+(to be completed). 
 
 ## R documentation
 
@@ -414,13 +529,27 @@ The super learner requires 3 components:
 2. A loss function  
 3. A model for combining the estimators in the library  
 
-These three components should be tailored to the specific problem. The library should be built such that each estimator in the library could individually estimate the parameter of interest. The loss function should be chosen to reflect the goals of the problem. If one is interested in estimating the hazard, the loss function should ideally involve the hazard; if interest in the survival function, the loss function should involve the survival function. This may seem common sense, but we often see researchers use a hazard loss function when the interest is on the survival probability at a specific time point. The loss function should be chosen with respect to the problem you are trying to solve. The model for combining the estimators in the library is often chosen to maintain a bounded loss function for the super learner.
+These three components should be tailored to the specific problem. The library 
+should be built such that each estimator in the library could individually 
+estimate the parameter of interest. The loss function should be chosen to 
+reflect the goals of the problem. If one is interested in estimating the hazard, 
+the loss function should ideally involve the hazard; if interest in the survival 
+function, the loss function should involve the survival function. This may seem 
+common sense, but we often see researchers use a hazard loss function when the 
+interest is on the survival probability at a specific time point. The loss 
+function should be chosen with respect to the problem you are trying to solve. 
+The model for combining the estimators in the library is often chosen to 
+maintain a bounded loss function for the super learner.
 
-#### Super Learner for survival data by minimizing **cross-validated negative partial log-likelihood**
+#### Super Learner for survival data by minimizing 
+**cross-validated negative partial log-likelihood**
 
 <https://github.com/kgolmakani/SuperLearner-Survival>
 
-Golmakani’s approach builds a Super Learner for survival data by minimizing **cross-validated negative partial log-likelihood**. So, the base learners are hazard-based learners optimized on Cox partial likelihood. This approach optimizes the best convex combination for **hazard ranking**. 
+Golmakani’s approach builds a Super Learner for survival data by minimizing 
+**cross-validated negative partial log-likelihood**. So, the base learners are 
+hazard-based learners optimized on Cox partial likelihood. This approach 
+optimizes the best convex combination for **hazard ranking**. 
 
 #### Survival Super Learner 
 

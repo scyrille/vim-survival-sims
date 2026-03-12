@@ -383,9 +383,9 @@ $\pi_j =(0.005, 0.02, 0.05, 0.20)$.
 Events times were simulated under the following time-constant additive hazards 
 model: 
 
-$$\lambda(t|x)=\lambda_0+\beta_{1}(t)X_{1}+\beta_{2}(t)X_{2}+\beta_{3}(t)X_{3}+\beta_{4}(t)X_{4}$$
+$$\lambda(t|x)=\lambda_0(t)+\beta_{1}(t)X_{1}+\beta_{2}(t)X_{2}+\beta_{3}(t)X_{3}+\beta_{4}(t)X_{4}$$
 
-with $\lambda_0=0.05$ and $\beta_j(t)=(0.06, 0.02, 0.005, 0)$. 
+with $\lambda_0(t)=0.05$ (constant) and $\beta_j(t)=(0.06, 0.02, 0.005, 0)$. 
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 

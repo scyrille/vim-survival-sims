@@ -6,7 +6,7 @@
 #'
 #' @return Numeric scalar (bias)
 estimate_bias <- function(est, true){
-  mean(est - true, na.rm = TRUE)
+  mean(est - true)
 }
 
 #' Standardized bias is typically defined as Bias / SD(true quantity).

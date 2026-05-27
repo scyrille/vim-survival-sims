@@ -16,7 +16,7 @@ execute:
   # echo: false
   message: false
   warning: false
-fig-height: 6
+fig-width: 4
 fig-align: "center"
 fig-cap-location: top
 html-math-method: mathml
@@ -38,6 +38,10 @@ source(here::here("R", "generate_data.R"))
 source(here::here("R", "performance_eval.R"))
 
 options(scipen = 999)
+
+# Set seed for reproducibility 
+set.seed(2026)
+R <- 1000
 ```
 
 \newpage
@@ -62,8 +66,6 @@ $$\Sigma = \left(
 \right)$$
 
 ```{r}
-set.seed(2026)
-
 n <- 1000
 prev <- c(0.1, 0.4, 0.6)
 
@@ -104,7 +106,6 @@ $$\Sigma = \left(
 \right)$$
 
 ```{r}
-set.seed(2026)
 Sigma0 <- diag(3)
 dna0 <- data.frame(simulate_dna_pathways(n, prev, Sigma0))
 
@@ -131,8 +132,7 @@ We simulate correlated variables grouped into blocks.
 -   Within-block correlations: $\rho_{k1} = 0.6, \quad \rho_{k2} = 0.5, \quad \rho_{k3} = 0.4, \quad \rho_{k4} = 0.1$
 -   Between-block correlation: $\rho_{B} = 0.05$
 
-```{r}
-set.seed(2026)
+```{r }
 p <- 20 
 
 # Generate random prevalences 
@@ -191,7 +191,7 @@ ggplot(mat_long, aes(Var1, Var2, fill = Freq)) +
 
 ------------------------------------------------------------------------
 
-All simulations were repeated across $R=100$ replications. 
+All simulations were repeated across $R=1000$ replications. 
 
 For each replicate, pairwise associations between DNA-based pathways were tested using Fisher's exact test, and the empirical type I error was estimated as the proportion of replications with p-values below the nominal significance level ($\alpha=0.05$)
 
@@ -205,9 +205,7 @@ We simulate correlated variables grouped into blocks.
 * Within-block correlations: $\rho_{k1} = 0.6, \quad \rho_{k2} = 0.5, \quad \rho_{k3} = 0.4, \quad \rho_{k4} = 0.05$
 * Between-block correlation: $\rho_{B} = 0.01$
 
-```{r eval=FALSE}
-set.seed(2026)
-R <- 1000
+```{r }
 n <- 1000
 p <- 20
 prev <- runif(p, 0.1, 0.6) %>%
@@ -225,8 +223,8 @@ Sigma %>%
     tibble::rownames_to_column("var1")%>%
     pivot_longer(-var1, names_to = "var2")%>%
     mutate(value = ifelse(var1==var2, NA, value),
-           var1 = factor(var1, levels = paste0("D",1:20)),
-           var2 = factor(var2, levels = paste0("D",1:20)))%>%
+           var1 = factor(var1, levels = paste0("X",1:20)),
+           var2 = factor(var2, levels = paste0("X",1:20)))%>%
     {
       ggplot(., aes(var1, var2, fill = value)) +
         geom_tile() +
@@ -252,9 +250,8 @@ dna_sims %>%
   dplyr::full_join(rownames_to_column(data.frame(true_prev = prev), 
                                       "pathway"), by ="pathway")%>%
   group_by(pathway) %>%
-  summarize(bias = estimate_bias(true = true_prev, est = est_prev),
-            pathway = factor(pathway, levels = paste0("D", 1:20)),
-            .groups = "drop")%>%
+  summarize(bias = estimate_bias(true = true_prev, est = est_prev))%>%
+  mutate(pathway = factor(pathway, levels = paste0("X", 1:20)))%>%
   {
     ggplot(., aes(x = pathway, y = bias, colour = pathway))+
       geom_point(aes(fill = "pathway"))+
@@ -328,8 +325,7 @@ $$\Sigma = \left(
 \end{array}
 \right)$$
 
-```{r}
-set.seed(2026)
+```{r }
 p <- 3 
 mu <- 0
 Sigma <- matrix(c(1,   0,   0.2,
@@ -397,8 +393,7 @@ We simulate correlated variables grouped into blocks.
 * Within-block correlations: $\rho_{k1} = 0.7, \quad \rho_{k2} = -0.2, \quad \rho_{k3} = 0.5, \quad \rho_{k4} = 0.1$
 * Between-block correlation: $\rho_{B} = 0.05$
 
-```{r}
-set.seed(2026)
+```{r }
 p = 20 
 
 # Initialize the matrix
@@ -457,7 +452,7 @@ as.data.frame(cor(rna_block))%>%
 
 ----------------------------------------------------
 
-All simulations were repeated across $R=100$ replications. 
+All simulations were repeated across $R=1000$ replications. 
 
 For each pathway, we computed the empirical mean, variance, and pairwise correlation coefficients of the RNA pathways across simulation replicates. 
 Mean, variance and correlation coefficients were averaged across replicates. 
@@ -469,9 +464,7 @@ Mean, variance and correlation coefficients were averaged across replicates.
 * Within-block correlations: $\rho_{k1} = 0.7, \quad \rho_{k2} = -0.2, \quad \rho_{k3} = 0.5, \quad \rho_{k4} = 0.3$
 * Between-block correlation: $\rho_{B} = 0.1$
 
-```{r}
-set.seed(2026)
-R <- 1000
+```{r }
 p <- 20 
 mu <- 0
 
@@ -569,15 +562,26 @@ as.data.frame(cor_sims_rna)%>%
 
 ## Aalen additive model 
 
-Four binary covariates were generated *independently* with prevalences spanning 
-rare to frequent alterations, $X_j \sim Bernoulli(\pi_j)$ with 
-$\pi_j =(0.005, 0.02, 0.05, 0.20)$. 
+Four binary covariates were generated *independently* with prevalence of 50%, $X_j \sim \mathcal{B}(0.4)$.
 
 Events times were simulated under the following time-constant additive hazards 
 model: 
 
 $$\lambda(t|x)=\lambda_0+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3}+\beta_{4}X_{4}$$
 with $\lambda_0=0.05$ and $\beta=(0.06, 0.02, 0.005, 0)$. 
+
+This means:
+
+* Having $X_1=1$ increases the hazard by $0.06$ compared with $X_1=0$
+* Having $X_2=1$ increases the hazard by $0.02$ compared with $X_2=0$
+* Having $X_3=1$ increases the hazard by $0.005$ compared with $X_3=0$
+* There are no difference in hazard between $X_4=1$ and $X_4=0$
+
+**Interpretation:** 
+
+* Each coefficient represents an absolute increase in instantaneous event rate
+* Effects combine by addition
+* A coefficient equal to zero means the variable does not contribute to the hazard
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
@@ -586,14 +590,12 @@ approximately 5%, and the calibrated value was then fixed across all
 simulation replicates. 
 
 ```{r}
-# Set seed for reproducibility 
-set.seed(2026)
-
 # Generate data
 n <- 1000
 p <- 4
 sigma <- diag(x = 1, nrow = p, ncol = p)
-prev <- c(0.005, 0.02, 0.05, 0.20)
+# prev <- c(0.005, 0.02, 0.05, 0.20)
+prev <- rep(0.4, 4)
 beta <- c(0.06, 0.02, 0.005, 0)
 lambda0 <- 0.05
 target_cens <- 0.05
@@ -604,84 +606,107 @@ c_max <- calibrate_c_max_aalen(lambda0     = lambda0,
                                target_cens = target_cens,
                                seed        = 2026)
 c_max
-data <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
-head(data)
+data_aalen <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
+head(data_aalen)
 
 # Check prevalences
-colMeans(data %>% dplyr::select(starts_with("X")))
+round(colMeans(data_aalen %>% dplyr::select(starts_with("X"))), 3)
 
 # Check censoring rate 
-mean(1 - data$event)
-
-# Kaplan-Meier 
-km_aalen_fit <- survfit(Surv(time, event)~1, data)
-km_aalen_fit
-ggsurvplot(km_aalen_fit, data = data, legend = "none")
-ggsurvplot(survfit(Surv(time, event)~X1, data), data)
-ggsurvplot(survfit(Surv(time, event)~X2, data), data)
-ggsurvplot(survfit(Surv(time, event)~X3, data), data)
-ggsurvplot(survfit(Surv(time, event)~X4, data), data)
-
-# Fit the Aalen model
-# All components of the model have nonparametric time-varying effects.
-aalen_fit <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data = data)
-summary(aalen_fit)
-
-# Coefficients
-# cum <- aalen_fit$cum
-# tmax <- max(cum[, "time"])
-# B_at_tmax <- cum[nrow(cum), -c(1,2)]
-# est_beta <- as.vector(B_at_tmax / tmax)
-# est_beta
-  
-# Plot the non-parametric cumulative regression coefficients with 95% CI
-# par(mfrow=c(1,2))
-plot(aalen_fit, ylim = c(-0.5,4))
-
-# Fit the model with the effect of X3 and X4 being constant
-aalen_fit2 <- timereg::aalen(Surv(time, event)~
-                               X1+X2+const(X3)+const(X4), 
-                             data = data)
-summary(aalen_fit2)
-# par(mfrow=c(1,2))
-plot(aalen_fit2, ylim = c(-0.5,4))
-
-# Fit the model with only time-constant effects 
-aalen_fit3 <- timereg::aalen(Surv(time, event)~
-                               const(X1)+const(X2)+const(X3)+const(X4), 
-                             data = data)
-summary(aalen_fit3)
-plot(aalen_fit3, ylim = c(-0.5,4))
+mean(1 - data_aalen$event)
 ```
 
-```{r}
-R <- 1000
-test_aalen <- replicate(R, {
-  data <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
-  #'For constant effects: cumulative coefficient B_j(t) ≈ beta_j * t.
-  #'Approximate beta_j by B_j(t_max) / t_max using the last available 
-  #'cumulative estimate.
-  #'timereg stores cumulative estimates in fit_obj$cum: matrix with columns 
-  #'(time, (coef, se) per covariate).
-  fit_obj <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data)
-  cum <- fit_obj$cum
-  tmax <- max(cum[, "time"])
-  B_at_tmax <- cum[nrow(cum), -c(1,2)]
-  est_beta <- as.vector(B_at_tmax / tmax)
-  
-  data.frame(
-    prev_X1   = mean(data$X1),
-    prev_X2   = mean(data$X2),
-    prev_X3   = mean(data$X3),
-    prev_X4   = mean(data$X4),
-    cens_rate = mean(1 - data$event),
-    beta_X1   = est_beta[1],
-    beta_X2   = est_beta[2],
-    beta_X3   = est_beta[3],
-    beta_X4   = est_beta[4]
-    )}, simplify = F)
+**Kaplan-Meier**
 
-colMeans(bind_rows(test_aalen))
+```{r }
+km_aalen_fit <- survfit(Surv(time, event)~1, data_aalen)
+km_aalen_fit
+ggsurvplot(km_aalen_fit, data = data_aalen, legend = "none")
+ggsurvplot(survfit(Surv(time, event)~X1, data_aalen))
+ggsurvplot(survfit(Surv(time, event)~X2, data_aalen))
+ggsurvplot(survfit(Surv(time, event)~X3, data_aalen))
+ggsurvplot(survfit(Surv(time, event)~X4, data_aalen))
+```
+
+**Aalen model**
+
+```{r}
+# Fit the model
+aalen_fit <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data = data_aalen)
+summary(aalen_fit)
+```
+***Test for non-significant effects***
+
+The model estimates the cumulative effects
+
+$$
+B_j(t)=\int_{0}^{t}\beta_j(u)du.
+$$
+
+The reported *Supremum test* evaluates $H_0: B_j(t)=0$, meaning the covariate has no effect on the hazard over time. 
+
+Interpretation of the results 
+
+* Intercept: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard is clearly non zero
+* $X_1$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_1$ affects the hazard 
+* $X_2$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[3], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_2$ affects the hazard 
+* $X_3$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[4], prepend_p = TRUE)` $\rightarrow$ No evidence that $X_3$ affects the hazard 
+* $X_4$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[5], prepend_p = TRUE)` $\rightarrow$ No evidence that $X_4$ affects the hazard 
+
+***Test for time invariant effects***
+
+Interpretation of the results of the Kolmogorov–Smirnov test
+
+Small p-values $rigtharrow$ evidence of time-varying effects. 
+
+* Intercept: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard clearly varies over time
+* $X_1$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that effect of $X_1$ changes over time
+* $X_2$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[3], prepend_p = TRUE)` $\rightarrow$ Strong evidence that effect of $X_2$ changes over time
+* $X_3$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[4], prepend_p = TRUE)` $\rightarrow$ No strong evidence against constant effect
+* $X_4$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[5], prepend_p = TRUE)` $\rightarrow$ No evidence of time variation
+
+```{r }
+# Plot the non-parametric cumulative regression coefficients with 95% CI
+plot(aalen_fit, ylim = c(-0.5,4))
+```
+
+---
+
+We simulated $R=1000$ datasets. 
+
+```{r}
+test_aalen <- replicate(R, {
+  # Generate data 
+  data <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
+  # Estimate prevalences 
+  prev <- colMeans(data %>% dplyr::select(starts_with("X")))%>%
+    stats::setNames(paste0("prev_", names(.)))
+  # Censoring rate 
+  cens_rate <- stats::setNames(mean(1 - data$event), "cens_rate")
+  # Fit Aalen model
+  fit_obj <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data)
+  # Tests
+  pval_supremum <- fit_obj[["pval.testBeq0"]] 
+  names(pval_supremum) <- paste0("pval_supremum_", names(pval_supremum)) 
+  pval_KS <- fit_obj[["pval.testBeqC"]] 
+  names(pval_KS) <- paste0("pval_KS_", names(pval_KS)) 
+  pval_CvM <- fit_obj[["pval.testBeqC.is"]] 
+  names(pval_CvM) <- paste0("pval_CvM_", names(pval_CvM))
+
+  c(prev, cens_rate, pval_supremum, pval_KS, pval_CvM)
+  }, simplify = F)%>%
+  bind_rows
+
+data.frame(colMeans(test_aalen))%>%
+  tibble::rownames_to_column()%>%
+  kable(col.names = c("Name","Value"))
+
+test_aalen %>%
+  dplyr::select(starts_with("pval"))%>%
+  dplyr::mutate(across(everything(), ~ifelse(.x<0.05, 1, 0)))%>%
+  dplyr::summarise_all(mean)%>%
+  tidyr::pivot_longer(everything())%>%
+  kable(col.names = c("p-value","Rejection probability"))
 ```
 
 ## Cox-Aalen model
@@ -702,14 +727,10 @@ simulated under a Cox-Aalen model with constant baseline hazard:
 $\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$ and $X_2$ with 
 coefficients $\beta_{1}=0.06$ and $\beta_{3}=0.005$, respectively. 
 Multiplicative (proportional hazards) effects were assigned to 
-$X_3$ and $X_4$ with coefficents $\beta_{2}=0.5$ and
+$X_3$ and $X_4$ with coefficients $\beta_{2}=0.5$ and
 $\beta_{4}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
 
 ```{r}
-# Set seed for reproducibility 
-set.seed(2026)
-
-# Generate data
 n <- 1000
 prev_add <- c(0.4, 0.4)
 sigma_add <- diag(x = 1, nrow = 2, ncol = 2)
@@ -733,74 +754,123 @@ c_max <- calibrate_c_max_cox_aalen(lambda0         = lambda0,
                                    target_cens     = target_cens,
                                    seed            = 2026)
 c_max
-data <- simulate_cox_aalen_data(n, lambda0, beta_add, beta_mult,
-                                prev_add, sigma_add,
-                                prev_mult, mean_mult,
-                                sigma_mult_bin, sigma_mult_cont,
-                                c_max)
-head(data)
+data_cox_aalen <- simulate_cox_aalen_data(
+  n, lambda0, beta_add, beta_mult,
+  prev_add, sigma_add, prev_mult, mean_mult,
+  sigma_mult_bin, sigma_mult_cont, c_max
+  )
+head(data_cox_aalen)
 
-# Check prevalences / mean 
-colMeans(data %>% dplyr::select(starts_with("X")))
+# Check prevalences
+colMeans(data_cox_aalen %>% dplyr::select(X1:X3))
+
+# Check mean and sd 
+round(mean(data_cox_aalen$X4), 3)
+sd(data_cox_aalen$X4)
 
 # Check censoring rate 
-mean(1 - data$event)
+mean(1 - data_cox_aalen$event)
+```
 
-# Kaplan-Meier
-km_cox_aalen_fit <- survfit(Surv(time, event)~1, data)
+**Kaplan-Meier**
+
+```{r }
+km_cox_aalen_fit <- survfit(Surv(time, event)~1, data_cox_aalen)
 km_cox_aalen_fit
-ggsurvplot(km_cox_aalen_fit, data = data, legend = "none")
-ggsurvplot(survfit(Surv(time, event)~X1, data), data)
-ggsurvplot(survfit(Surv(time, event)~X2, data), data)
-ggsurvplot(survfit(Surv(time, event)~X3, data), data)
+ggsurvplot(km_cox_aalen_fit, data = data_cox_aalen, legend = "none")
+ggsurvplot(survfit(Surv(time, event)~X1, data_cox_aalen))
+ggsurvplot(survfit(Surv(time, event)~X2, data_cox_aalen))
+ggsurvplot(survfit(Surv(time, event)~X3, data_cox_aalen))
+```
 
+**Cox-Aalen model**
+
+```{r}
 # Fit Cox-Aalen model 
-cox_aalen_fit <- timereg::cox.aalen(
-  Surv(time, event)~X1+X2+prop(X3)+prop(X4), 
-  data)
+cox_aalen_fit <- timereg::cox.aalen(Surv(time, event)~X1+X2+prop(X3)+prop(X4), 
+                                    data = data_cox_aalen, n.sim = 1000, basesim = 1)
 summary(cox_aalen_fit)
+```
+***Test for non-significant effects***
 
+* Intercept: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeq0[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard is clearly non zero
+* $X_1$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeq0[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_1$ affects the hazard 
+* $X_2$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeq0[3], prepend_p = TRUE)` $\rightarrow$ No evidence that $X_2$ affects the hazard 
+
+***Test for time invariant effects***
+
+* Intercept: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeqC[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard clearly varies over time
+* $X_1$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeqC[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_1$ affects the hazard 
+* $X_2$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeqC[3], prepend_p = TRUE)` $\rightarrow$ No evidence of time variation
+
+***Test of proportionality***
+
+* $X_3$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.Prop[1], prepend_p = TRUE)` $\rightarrow$ Compatible with a proportional effect
+* $X_4$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.Prop[2], prepend_p = TRUE)` $\rightarrow$ Compatible with a proportional effect
+
+```{r }
 # Plot additive Aalen terms
-# par(mfrow = c(1,2))
 plot(cox_aalen_fit, ylim = c(-0.5,5))
 
-# Allow X2 to be time-constant 
-cox_aalen_fit2 <- timereg::cox.aalen(
-  Surv(time, event)~X1+const(X2)+prop(X3)+prop(X4), 
-  data, robust = TRUE)
-summary(cox_aalen_fit2)
-
-# Proportional excess terms of model 
-cox(cox_aalen_fit2)
-# par(mfrow=c(1,2))
-plot(cox_aalen_fit2,score= TRUE) 
-
-# Plot additive Aalen terms
-# par(mfrow = c(1,2))
-plot(cox_aalen_fit2, ylim = c(-0.5, 5)) 
+# Plot multiplicative terms 
+plot(cox_aalen_fit,  score= TRUE) 
 ```
+
+---
+
+We simulated $R=1000$ datasets. 
+
 ```{r}
-R <- 1000
 test_cox_aalen <- replicate(R, {
+  # Generate data 
   data <- simulate_cox_aalen_data(n, lambda0, beta_add, beta_mult,
                                   prev_add, sigma_add,
                                   prev_mult, mean_mult,
                                   sigma_mult_bin, sigma_mult_cont,
                                   c_max)
-  cox_aalen_fit <- timereg::cox.aalen(
-    Surv(time, event)~X1+X2+prop(X3)+prop(X4),
-    data = data)
-  coef <- data.frame(coef(cox_aalen_fit))
-  data.frame(
-    prev_X1   = mean(data$X1),
-    prev_X2   = mean(data$X2),
-    prev_X3   = mean(data$X3),
-    mean_X4   = mean(data$X4),
-    cens_rate = mean(1 - data$event),
-    beta_X3   = coef[1, "Coef."],
-    beta_X4   = coef[2, "Coef."]
-    )}, simplify = F)
+  # Estimate prevalences 
+  prev <- colMeans(data %>% dplyr::select(X1:X3))%>%
+    stats::setNames(paste0("prev_", names(.)))
+  # Mean and sd X4 
+  mean_sd_X4 <- stats::setNames(c(mean(data$X4), sd(data$X4)),
+                                c("mean_X4","sd_X4"))
+  # Censoring rate 
+  cens_rate <- stats::setNames(mean(1 - data$event), "cens_rate")
+  # Fit Cox-Aalen model
+  fit_obj <- timereg::cox.aalen(Surv(time, event)~X1+X2+prop(X3)+prop(X4),
+                                data = data, n.sim = 1000, basesim = 1)
+  # Additive terms 
+  pval_supremum <- fit_obj[["pval.testBeq0"]] 
+  names(pval_supremum) <- paste0("pval_supremum_", names(pval_supremum)) 
+  pval_KS <- fit_obj[["pval.testBeqC"]] 
+  names(pval_KS) <- paste0("pval_KS_", names(pval_KS)) 
+  # pval_CvM <- fit_obj[["pval.testBeqC.is"]] 
+  # names(pval_CvM) <- paste0("pval_CvM", names(pval_CvM))
+  # Multiplicative terms 
+  coef <- coef(fit_obj)[,"Coef."]
+  # Test for proportional 
+  pval_prop <- stats::setNames(
+    fit_obj$pval.Prop, 
+    gsub("prop\\(|\\)","", paste0("pval_prop_", names(fit_obj$pval.Prop)))
+    )
+  
+  c(prev, mean_sd_X4, cens_rate, 
+    pval_supremum, pval_KS, #pval_CvM, 
+    coef, pval_prop)
+  
+  }, simplify = F)%>%
+  bind_rows()
 
-colMeans(bind_rows(test_cox_aalen))
+data.frame(round(colMeans(test_cox_aalen),3))%>%
+  tibble::rownames_to_column()%>%
+  kable(col.names = c("Name","Value"))
+
+test_cox_aalen %>%
+  dplyr::select(starts_with("pval"))%>%
+  dplyr::mutate(across(everything(), ~ifelse(.x<0.05, 1, 0)))%>%
+  dplyr::summarise_all(mean)%>%
+  tidyr::pivot_longer(everything())%>%
+  mutate(value = round(value, 3))%>%
+  kable(col.names = c("p-value","Rejection probability"))
 ```
 

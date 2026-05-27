@@ -1,165 +1,160 @@
-#' Estimate conditional survival function nuisance parameters using the Aalen model
-#'
-#' @param time \code{n x 1} numeric vector of observed
-#' follow-up times. If there is censoring, these are the minimum of the
-#' event and censoring times.
-#' @param event \code{n x 1} numeric vector of status indicators of
-#' whether an event was observed.
-#' @param X \code{n x p} data.frame of observed covariate values
-#' @param X_holdout \code{m x p} data.frame of new observed covariate
-#' values at which to obtain \code{m} predictions for the estimated algorithm.
-#' Must have the same names and structure as \code{X}.
-#' @param newtimes \code{k x 1} numeric vector of times at which to obtain \code{k}
-#' predicted conditional survivals.
-#'
-#' @return A list containing elements \code{S_hat} (conditional event survival function, corresponding to \code{X_holdout} and \code{newtimes}),
-#' \code{S_hat_train} (conditional event survival function, corresponding to \code{X} and \code{newtimes}),
-#' \code{G_hat} (conditional censoring survival function, corresponding to \code{X_holdout} and \code{newtimes}),
-#' and \code{G_hat_train} (conditional censoring survival function, corresponding to \code{X} and \code{newtimes})
-#'
-#' @export
-conditional_surv_aalen <- function(time, event, X, X_holdout, newtimes){
-  
-  # ---- Event model: S(t|X) ----
-  datS <- data.frame(time = time, event = event, X)
-  S_fit <- timereg::aalen(survival::Surv(time, event) ~ ., data = datS)
-  
-  S_hat       <- pec::predictSurvProb(S_fit, newdata = X_holdout, times = newtimes)
-  S_hat_train <- pec::predictSurvProb(S_fit, newdata = X,         times = newtimes)
-  
-  # ---- Censoring model: G(t|X) ----
-  cens_event <- 1 - event
-  datG <- data.frame(time = time, cens_event = cens_event, X)
-  G_fit <- timereg::aalen(survival::Surv(time, cens_event) ~ ., data = datG)
-  
-  G_hat       <- pec::predictSurvProb(G_fit, newdata = X_holdout, times = newtimes)
-  G_hat_train <- pec::predictSurvProb(G_fit, newdata = X,         times = newtimes)
-  
-  list(
-    S_hat = S_hat,
-    G_hat = G_hat,
-    S_hat_train = S_hat_train,
-    G_hat_train = G_hat_train
-  )
-}
 
-#' Estimate conditional survival function nuisance parameters using survival stacking
-#'
-#' @param time \code{n x 1} numeric vector of observed
-#' follow-up times. If there is censoring, these are the minimum of the
-#' event and censoring times.
-#' @param event \code{n x 1} numeric vector of status indicators of
-#' whether an event was observed.
-#' @param X \code{n x p} data.frame of observed covariate values
-#' @param X_holdout \code{m x p} data.frame of new observed covariate
-#' values at which to obtain \code{m} predictions for the estimated algorithm.
-#' Must have the same names and structure as \code{X}.
-#' @param approx_times Numeric vector of times at which to
-#' approximate product integral or cumulative hazard interval. See [stackG] documentation.
-#' @param SL.library Super Learner library
-#' @param V Number of cross-validation folds, to be passed to \code{SuperLearner}
-#' @param newtimes \code{k x 1} numeric vector of times at which to obtain \code{k}
-#' predicted conditional survivals.
-#' @param bin_size Size of time bin on which to discretize for estimation
-#' of cumulative probability functions. Can be a number between 0 and 1,
-#' indicating the size of quantile grid (e.g. \code{0.1} estimates
-#' the cumulative probability functions on a grid based on deciles of
-#' observed \code{time}s). If \code{NULL}, creates a grid of
-#' all observed \code{time}s. See [stackG] documentation.
-#'
-#' @return A list containing elements \code{S_hat} (conditional event survival function, corresponding to \code{X_holdout} and \code{newtimes}),
-#' \code{S_hat_train} (conditional event survival function, corresponding to \code{X} and \code{newtimes}),
-#' \code{G_hat} (conditional censoring survival function, corresponding to \code{X_holdout} and \code{newtimes}),
-#' and \code{G_hat_train} (conditional censoring survival function, corresponding to \code{X} and \code{newtimes})
-#'
-#' @seealso [stackG]
-#'
-#' @export
-generate_nuisance_predictions_stackG <- function(time,
-                                                 event,
-                                                 X,
-                                                 X_holdout,
-                                                 newtimes,
-                                                 SL.library,
-                                                 V,
-                                                 bin_size,
-                                                 approx_times){
+generate_full_predictions <- function(time,
+                                      event,
+                                      X,
+                                      X_holdout, 
+                                      landmark_times,
+                                      approx_times,
+                                      nuisance){
   
-  surv_out <- survML::stackG(time = time,
-                             event = event,
-                             X = X,
-                             newX = rbind(X_holdout, X),
-                             newtimes = newtimes,
-                             time_grid_approx = approx_times,
-                             bin_size = bin_size,
-                             time_basis = "continuous",
-                             surv_form = "PI",
-                             SL_control = list(SL.library = SL.library,
-                                               V = V))
-  S_hat <- surv_out$S_T_preds[1:nrow(X_holdout),]
-  G_hat <- surv_out$S_C_preds[1:nrow(X_holdout),]
-  S_hat_train <- surv_out$S_T_preds[(nrow(X_holdout)+1):(nrow(X_holdout)+nrow(X)),]
-  G_hat_train <- surv_out$S_C_preds[(nrow(X_holdout)+1):(nrow(X_holdout)+nrow(X)),]
+  if (nuisance == "stackG"){
+    
+    SL.library <- c("SL.mean", "SL.gam","SL.ranger")
+    bin_size <- 0.5
+    surv_out <- survML::stackG(time = time,
+                               event = event,
+                               X = X,
+                               newX = rbind(X_holdout, X),
+                               newtimes = approx_times,
+                               time_grid_approx = approx_times,
+                               bin_size = bin_size,
+                               time_basis = "continuous",
+                               surv_form = "PI",
+                               SL_control = list(SL.library = SL.library,
+                                                 V = 5))
+    S_hat <- surv_out$S_T_preds[1:nrow(X_holdout),]
+    G_hat <- surv_out$S_C_preds[1:nrow(X_holdout),]
+    f_hat <- S_hat[,which(approx_times %in% landmark_times),drop=FALSE]
+    S_hat_train <- surv_out$S_T_preds[(nrow(X_holdout)+1):(nrow(X_holdout)+nrow(X)),]
+    G_hat_train <- surv_out$S_C_preds[(nrow(X_holdout)+1):(nrow(X_holdout)+nrow(X)),]
+    f_hat_train <- S_hat_train[,which(approx_times %in% landmark_times),drop=FALSE]
+  } 
+  
+  else if (nuisance == "aalen"){
+    
+    # Event model: S(t|X) 
+    datS <- data.frame(time = time, event = event, X)
+    S_fit <- timereg::aalen(survival::Surv(time, event) ~ ., data = datS)
+    
+    # Censoring model: G(t|X) 
+    cens_event <- 1 - event
+    datG <- data.frame(time = time, cens_event = cens_event, X)
+    G_fit <- timereg::aalen(survival::Surv(time, cens_event) ~ ., data = datG)
+    
+    S_hat       <- pec::predictSurvProb(S_fit, newdata = X_holdout, times = approx_times)
+    G_hat       <- pec::predictSurvProb(G_fit, newdata = X_holdout, times = approx_times)
+    f_hat       <- S_hat[,which(approx_times %in% landmark_times),drop=FALSE]
+    S_hat_train <- pec::predictSurvProb(S_fit, newdata = X,         times = approx_times)
+    G_hat_train <- pec::predictSurvProb(G_fit, newdata = X,         times = approx_times)
+    f_hat_train <- S_hat_train[,which(approx_times %in% landmark_times),drop=FALSE]
+  
+  }
+  
+  # else if (nuisance == "cox.aalen"){
+  #   
+  # }
+  # 
+  # else if (nuisance == "survivalSL"){
+  #   
+  # }
+  
   return(list(S_hat = S_hat,
               G_hat = G_hat,
+              f_hat = f_hat,
+              f_hat_train = f_hat_train,
               S_hat_train = S_hat_train,
               G_hat_train = G_hat_train))
 }
 
-generate_oracle_predictions_DR <- function(time,
-                                           event,
-                                           X,
-                                           X_holdout,
-                                           nuisance_preds,
-                                           outcome,
-                                           landmark_times,
-                                           restriction_time,
-                                           approx_times,
-                                           SL.library,
-                                           V,
-                                           indx){
+
+
+
+generate_reduced_predictions <- function(f_hat,
+                                         X_reduced,
+                                         X_reduced_holdout){
+
+  SL.library <- c("SL.mean", "SL.gam","SL.ranger")
+  long_dat <- data.frame(f_hat = f_hat, X_reduced)
+  long_new_dat <- data.frame(X_reduced_holdout)
+  reduced_fit <- SuperLearner::SuperLearner(Y = long_dat$f_hat,
+                                            X = long_dat[,2:ncol(long_dat),drop=FALSE],
+                                            family = stats::gaussian(),
+                                            SL.library = SL.library,
+                                            method = "method.NNLS",
+                                            verbose = FALSE)
+  fs_hat <- matrix(predict(reduced_fit, newdata = long_new_dat)$pred,
+                   nrow = nrow(X_reduced_holdout),
+                   ncol = 1)
   
-  S_hat <- nuisance_preds$S_hat_train
-  G_hat <- nuisance_preds$G_hat_train
+  return(list(fs_hat = fs_hat))
+}
+
+CV_generate_full_predictions_landmark <- function(time,
+                                                  event,
+                                                  X,
+                                                  landmark_times,
+                                                  approx_times,
+                                                  nuisance,
+                                                  cf_folds) {
   
-  if (sum(indx) != 0){ # only remove column if there is a column to remove
-    X <- X[,-indx,drop=FALSE]
-    X_holdout <- X_holdout[,-indx,drop=FALSE]
-  }
+  V <- length(unique(cf_folds))
   
-  if (outcome == "survival_probability"){
-    newtimes <- landmark_times
-  } else if (outcome == "restricted_survival_time"){
-    newtimes <- restriction_time
-  }
-  DR_predictions_combined <- DR_pseudo_outcome_regression(time = time,
-                                                          event = event,
-                                                          X = X,
-                                                          newX = rbind(X_holdout, X),
-                                                          S_hat = S_hat,
-                                                          G_hat = G_hat,
-                                                          newtimes = newtimes,
-                                                          outcome = outcome,
-                                                          approx_times = approx_times,
-                                                          SL.library = SL.library,
-                                                          V = V)
+  res <- purrr::map(seq_len(V), function(j) {
+    
+    train_id <- cf_folds != j
+    test_id  <- cf_folds == j
+    
+    full_preds <- generate_full_predictions(
+      time = time[train_id],
+      event = event[train_id],
+      X = X[train_id, , drop = FALSE],
+      X_holdout = X[test_id, , drop = FALSE],
+      landmark_times = landmark_times,
+      approx_times = approx_times,
+      nuisance = nuisance
+    )
+    
+    list(
+      CV_full_preds_train = full_preds$f_hat_train,
+      CV_full_preds = full_preds$f_hat,
+      CV_S_preds = full_preds$S_hat,
+      CV_S_preds_train = full_preds$S_hat_train,
+      CV_G_preds = full_preds$G_hat,
+      CV_G_preds_train = full_preds$G_hat_train
+    )
+  })
   
-  DR_predictions <- DR_predictions_combined[1:nrow(X_holdout),]
-  DR_predictions_train <- DR_predictions_combined[(nrow(X_holdout) + 1):nrow(DR_predictions_combined),]
+  purrr::transpose(res)
+}
+
+CV_generate_reduced_predictions_landmark <- function(time,
+                                                     event,
+                                                     X,
+                                                     landmark_times,
+                                                     cf_folds,
+                                                     indx,
+                                                     full_preds_train) {
   
-  if (outcome == "survival_probability"){
-    f0_hat <- 1 - DR_predictions
-    f0_hat_train <- 1 - DR_predictions_train
-    if (length(landmark_times) == 1){
-      f0_hat <- matrix(f0_hat, ncol = 1)
-      f0_hat_train <- matrix(f0_hat_train, ncol = 1)
-    }
-  } else if (outcome == "restricted_survival_time"){
-    f0_hat <- DR_predictions
-    f0_hat_train <- DR_predictions_train
-  }
+  V <- length(unique(cf_folds))
   
-  return(list(f0_hat = f0_hat,
-              f0_hat_train = f0_hat_train))
-  
+  purrr::map(seq_len(V), function(j) {
+    
+    train_id <- cf_folds != j
+    test_id  <- cf_folds == j
+    
+    X_reduced_train <- X[train_id, -indx, drop = FALSE]
+    X_reduced_holdout <- X[test_id, -indx, drop = FALSE]
+    
+    purrr::map_dfc(seq_along(landmark_times), function(k) {
+      
+      reduced_preds <- generate_reduced_predictions(
+        f_hat = full_preds_train[[j]][, k],
+        X_reduced = X_reduced_train,
+        X_reduced_holdout = X_reduced_holdout
+      )
+      
+      tibble::tibble(!!paste0("t", landmark_times[k]) := reduced_preds$fs_hat)
+      
+    }) %>% as.matrix()
+  })
 }

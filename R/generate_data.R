@@ -98,6 +98,60 @@ simulate_rna_pathways <- function(n,
   return(as.data.frame(scaled_scores))
 }
 
+
+#' Simulate data under a Cox proportional hazards model
+#'
+#' @param n Integer. Sample size.
+#' @param prev Numeric vector of length `p` with marginal prevalences of binary
+#'   covariates.
+#' @param sigma Numeric `p x p` correlation/covariance matrix for latent Gaussian variables.
+#' @param lambda0 Numeric. Constant baseline hazard.
+#' @param beta Numeric vector of log-hazard ratios.
+#' @param c_max Numeric. Maximum censoring time. C ~ Uniform(0, c_max).
+#'
+#' @return A data.frame containing observed time, event indicator and covariates.
+#'
+#' @export
+simulate_cox_data <- function(n, prev, sigma, lambda0, beta, c_max) {
+  
+  p <- length(prev)
+  
+  stopifnot(length(beta) == p)
+  stopifnot(is.numeric(prev), all(prev > 0 & prev < 1))
+  stopifnot(is.matrix(sigma), all(dim(sigma) == c(p, p)))
+  stopifnot(lambda0 > 0)
+  stopifnot(c_max > 0)
+  
+  # Latent Gaussian generation
+  Z <- MASS::mvrnorm(n = n, mu = rep(0, p), Sigma = sigma)
+  
+  # Thresholds matching marginal prevalences
+  thresholds <- qnorm(prev)
+  
+  # Dichotomization: P(X_j = 1) = prev_j
+  X <- sweep(Z, 2, thresholds, "<") * 1L
+  X <- as.matrix(X)
+  colnames(X) <- paste0("X", seq_len(p))
+  
+  # Individual hazard rate under Cox PH model
+  # lambda(t | X) = lambda0 * exp(X beta)
+  linpred <- as.vector(X %*% beta)
+  lambdaX <- lambda0 * exp(linpred)
+  
+  # Event times from exponential distribution
+  U <- runif(n)
+  T <- -log(U) / lambdaX
+  
+  # Independent censoring times
+  C <- runif(n, min = 0, max = c_max)
+  
+  # Observed data
+  time <- pmin(T, C)
+  event <- as.integer(T <= C)
+  
+  data.frame(time = time, event = event, X, check.names = FALSE)
+}
+
 #' Simulate data under an Aalen additive model
 #'
 #' @param n Integer. Sample size.
@@ -261,6 +315,86 @@ simulate_cox_aalen_data <- function(n,
   event <- as.integer(T <= C)
   
   data.frame(time = time, event = event, X_add, X_mult, check.names = FALSE)
+}
+
+#' Calibrate the upper bound of a Uniform censoring distribution
+#' to achieve a target censoring proportion under a Cox proportional hazards model.
+#'
+#' @param n_cal Integer. Number of individuals used in the Monte Carlo calibration step.
+#' @param lambda0 Numeric. Constant baseline hazard.
+#' @param beta Numeric vector of log-hazard ratios.
+#' @param prev Numeric vector of marginal prevalences of the binary covariates.
+#' @param sigma Numeric correlation/covariance matrix for the latent Gaussian variables.
+#' @param target_cens Numeric. Desired censoring proportion.
+#' @param seed Integer. Random seed used during the calibration procedure.
+#' @param max_upper Numeric. Upper bound used during the root-finding procedure.
+#'
+#' @return A single numeric value corresponding to the calibrated parameter
+#'   `c_max` such that the expected censoring proportion is approximately
+#'   equal to `target_cens`.
+#'
+#' @export
+calibrate_c_max_cox <- function(
+    n_cal = 200000,
+    lambda0 = 0.1,
+    beta,
+    prev,
+    sigma,
+    target_cens = 0.20,
+    seed = 2026,
+    max_upper = 1e6
+) {
+  set.seed(seed)
+  
+  p <- length(prev)
+  
+  stopifnot(length(beta) == p)
+  stopifnot(is.numeric(prev), all(prev > 0 & prev < 1))
+  stopifnot(is.matrix(sigma), all(dim(sigma) == c(p, p)))
+  stopifnot(lambda0 > 0)
+  stopifnot(target_cens > 0, target_cens < 1)
+  
+  # ------ Simulate binary covariates ----- #
+  Z <- MASS::mvrnorm(n = n_cal, mu = rep(0, p), Sigma = sigma)
+  
+  # Thresholds matching marginal prevalences
+  thresholds <- qnorm(prev)
+  
+  # Dichotomization: P(X_j = 1) = prev_j
+  X <- sweep(Z, 2, thresholds, "<") * 1L
+  X <- as.matrix(X)
+  colnames(X) <- paste0("X", seq_len(p))
+  
+  # ------ Individual hazards under Cox PH ----- #
+  # lambda(t | X) = lambda0 * exp(X beta)
+  linpred <- as.vector(X %*% beta)
+  lambdaX <- lambda0 * exp(linpred)
+  
+  # ------ Event times ----- #
+  U <- runif(n_cal)
+  T <- -log(U) / lambdaX
+  
+  # ------ Expected censoring proportion under C ~ Uniform(0, c_max) ----- #
+  cens_rate_det <- function(cmax) {
+    mean(pmin(1, T / cmax))
+  }
+  
+  f <- function(cmax) cens_rate_det(cmax) - target_cens
+  
+  lower <- 1e-8
+  upper <- 1
+  
+  while (f(upper) > 0 && upper < max_upper) {
+    upper <- upper * 2
+  }
+  
+  if (f(lower) * f(upper) > 0) {
+    stop("Could not bracket root; increase max_upper or check target_cens.")
+  }
+  
+  censor_max <- uniroot(f, interval = c(lower, upper))$root
+  
+  censor_max
 }
 
 

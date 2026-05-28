@@ -209,7 +209,21 @@ vim_stackG_scen1 <- purrr::map_dfr(indxs, function(indx_i) {
   })
 })
 
-kable(vim_stackG_scen1)
+kable(vim_stackG_scen1 %>% 
+        dplyr::filter(vim == "AUC")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC"))
+
+kable(vim_stackG_scen1 %>% 
+        dplyr::filter(vim == "brier")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
 ### Aalen model
@@ -286,10 +300,22 @@ vim_aalen_scen1 <- purrr::map_dfr(indxs, function(indx_i) {
   })
 })
 
-kable(vim_aalen_scen1)
+kable(vim_aalen_scen1 %>% 
+        dplyr::filter(vim == "AUC")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC"))
+
+kable(vim_aalen_scen1 %>% 
+        dplyr::filter(vim == "brier")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
-
-
 
 # Scenario 2: Mixed additive and multiplicative hazards
 
@@ -473,7 +499,21 @@ vim_stackG_scen2 <- purrr::map_dfr(indxs, function(indx_i) {
   })
 })
 
-kable(vim_stackG_scen2)
+kable(vim_stackG_scen2 %>% 
+        dplyr::filter(vim == "AUC")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC"))
+
+kable(vim_stackG_scen2 %>% 
+        dplyr::filter(vim == "brier")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
 ### Cox-Aalen model
@@ -550,7 +590,21 @@ vim_cox_aalen_scen2 <- purrr::map_dfr(indxs, function(indx_i) {
   })
 })
 
-kable(vim_cox_aalen_scen2)
+kable(vim_cox_aalen_scen2 %>% 
+        dplyr::filter(vim == "AUC")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC"))
+
+kable(vim_cox_aalen_scen2 %>% 
+        dplyr::filter(vim == "brier")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
 # Scenario 3: Rare genomic alterations with mixed effects under proportional
@@ -578,7 +632,7 @@ $$
 
 Covariates were partitioned according to both their prevalence and prognostic effect size, resulting in the following combinations:
 
-```{r}
+```{r echo=FALSE}
 knitr::kable(
   data.frame(
     `Alteration frequency` = c(
@@ -607,7 +661,8 @@ knitr::kable(
     )
   ),
   escape = FALSE,
-  align = "llcc"
+  align = "llcc",
+  col.names = c("Alteration frequency","Effect category","HR","$\\beta$")
 )
 ```
 
@@ -741,116 +796,130 @@ vim_stackG_scen3 <- purrr::map_dfr(indxs, function(indx_i) {
   })
 })
 
-kable(vim_stackG_scen3)
+kable(vim_stackG_scen3 %>% 
+        dplyr::filter(vim == "AUC")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC"))
+
+kable(vim_stackG_scen3 %>% 
+        dplyr::filter(vim == "brier")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
 # Additional numerical experiments 
 
 ## Sensitivity to covariate correlations 
 
-### Additive hazards
+<!-- ### Additive hazards -->
 
-#### Global survival stacking 
+<!-- #### Global survival stacking  -->
 
-#### Aalen model
+<!-- #### Aalen model -->
 
-### Mixed additive and multiplicative hazards 
+<!-- ### Mixed additive and multiplicative hazards  -->
 
-#### Global survival stacking 
+<!-- #### Global survival stacking  -->
 
-#### Cox-Aalen model
+<!-- #### Cox-Aalen model -->
 
-## Exclusion versus permutation variable importance 
+## Exclusion versus permutation variable importance
 
-### Aalen hazards
+<!-- ### Aalen hazards -->
 
-#### Aalen model
+<!-- #### Aalen model -->
 
-```{r}
-# Fit the Aalen model
-aalen_fit <- timereg::aalen(
-  Surv(time, event)~., data = data_scen1,
-  resample.iid = 1)
+<!-- ```{r} -->
+<!-- # Fit the Aalen model -->
+<!-- aalen_fit <- timereg::aalen( -->
+<!--   Surv(time, event)~., data = data_scen1, -->
+<!--   resample.iid = 1) -->
 
-# Model performance 
-aalen_exp <- survex::explain(
-  aalen_fit, data = data_scen1[,c("X1","X2","X3","X4")],
-  y = Surv(data_scen1$time, data_scen1$event), label = "aalen")
-aalen_perf <- model_performance(
-  aalen_exp, 
-  metrics = c(`C/D AUC` = cd_auc, 
-              `Brier score` = brier_score)
-  )
-plot(aalen_perf)
+<!-- # Model performance  -->
+<!-- aalen_exp <- survex::explain( -->
+<!--   aalen_fit, data = data_scen1[,c("X1","X2","X3","X4")], -->
+<!--   y = Surv(data_scen1$time, data_scen1$event), label = "aalen") -->
+<!-- aalen_perf <- model_performance( -->
+<!--   aalen_exp,  -->
+<!--   metrics = c(`C/D AUC` = cd_auc,  -->
+<!--               `Brier score` = brier_score) -->
+<!--   ) -->
+<!-- plot(aalen_perf) -->
 
-times <- quantile(data_scen1$time, c(0.25, 0.75))
-aalen_perf_times <- model_performance(
-  aalen_exp, 
-  metrics = c(`C/D AUC` = cd_auc, 
-              `Brier score` = brier_score), 
-  times = times)
-aalen_perf_times$result
+<!-- times <- quantile(data_scen1$time, c(0.25, 0.75)) -->
+<!-- aalen_perf_times <- model_performance( -->
+<!--   aalen_exp,  -->
+<!--   metrics = c(`C/D AUC` = cd_auc,  -->
+<!--               `Brier score` = brier_score),  -->
+<!--   times = times) -->
+<!-- aalen_perf_times$result -->
 
-# Variable importance
-permut_aalen_brier <- model_parts(
-  aalen_exp, B = 10, type = "difference",
-  loss_function = survex::loss_brier_score
-  )
-plot(permut_aalen_brier)
-# model_parts(
-#   aalen_exp, B = 10, type = "difference",
-#   loss_function = survex::loss_brier_score,
-#   times = times
-#   )
-permut_aalen_auc <- model_parts(
-  aalen_exp, B = 10, type = "difference",
-  loss_function = survex::loss_one_minus_cd_auc
-  )
-plot(permut_aalen_auc)
-# model_parts(
-#   aalen_exp, B = 10, type = "difference",
-#   loss_function = survex::loss_one_minus_cd_auc,
-#   times = times 
-#   )
-```
+<!-- # Variable importance -->
+<!-- permut_aalen_brier <- model_parts( -->
+<!--   aalen_exp, B = 10, type = "difference", -->
+<!--   loss_function = survex::loss_brier_score -->
+<!--   ) -->
+<!-- plot(permut_aalen_brier) -->
+<!-- # model_parts( -->
+<!-- #   aalen_exp, B = 10, type = "difference", -->
+<!-- #   loss_function = survex::loss_brier_score, -->
+<!-- #   times = times -->
+<!-- #   ) -->
+<!-- permut_aalen_auc <- model_parts( -->
+<!--   aalen_exp, B = 10, type = "difference", -->
+<!--   loss_function = survex::loss_one_minus_cd_auc -->
+<!--   ) -->
+<!-- plot(permut_aalen_auc) -->
+<!-- # model_parts( -->
+<!-- #   aalen_exp, B = 10, type = "difference", -->
+<!-- #   loss_function = survex::loss_one_minus_cd_auc, -->
+<!-- #   times = times  -->
+<!-- #   ) -->
+<!-- ``` -->
 
-#### Random survival forests
+<!-- #### Random survival forests -->
 
-```{r}
-# Fit random survival forests
-rfsrc_fit <- randomForestSRC::rfsrc(Surv(time, event)~., data_scen1, 
-                                    importance = "none",
-                                    splitrule = "logrank",
-                                    seed = 2024)
+<!-- ```{r} -->
+<!-- # Fit random survival forests -->
+<!-- rfsrc_fit <- randomForestSRC::rfsrc(Surv(time, event)~., data_scen1,  -->
+<!--                                     importance = "none", -->
+<!--                                     splitrule = "logrank", -->
+<!--                                     seed = 2024) -->
 
-# Model performance 
-rfsrc_exp <- survex::explain(rfsrc_fit, data = data_scen1[,c("X1","X2","X3","X4")],
-                             y = Surv(data_scen1$time, data_scen1$event))
-rfsrc_perf <- model_performance(
-  rfsrc_exp, 
-  metrics = c(`C/D AUC` = cd_auc, 
-              `Brier score` = brier_score)
-  )
-plot(rfsrc_perf)
+<!-- # Model performance  -->
+<!-- rfsrc_exp <- survex::explain(rfsrc_fit, data = data_scen1[,c("X1","X2","X3","X4")], -->
+<!--                              y = Surv(data_scen1$time, data_scen1$event)) -->
+<!-- rfsrc_perf <- model_performance( -->
+<!--   rfsrc_exp,  -->
+<!--   metrics = c(`C/D AUC` = cd_auc,  -->
+<!--               `Brier score` = brier_score) -->
+<!--   ) -->
+<!-- plot(rfsrc_perf) -->
 
-rfsrc_perf_times <- model_performance(
-  rfsrc_exp, 
-  metrics = c(`C/D AUC` = cd_auc, 
-              `Brier score` = brier_score), 
-  times = times
-  )
-rfsrc_perf_times$result
+<!-- rfsrc_perf_times <- model_performance( -->
+<!--   rfsrc_exp,  -->
+<!--   metrics = c(`C/D AUC` = cd_auc,  -->
+<!--               `Brier score` = brier_score),  -->
+<!--   times = times -->
+<!--   ) -->
+<!-- rfsrc_perf_times$result -->
 
-# Variable importance 
-permut_rfsrc_brier <- model_parts(
-  rfsrc_exp, B = 10, type = "difference",
-  loss_function = survex::loss_brier_score
-  )
-plot(permut_rfsrc_brier) 
-permut_rfsrc_auc <- model_parts(
-  rfsrc_exp, B = 10, type = "difference",
-  loss_function = survex::loss_one_minus_cd_auc
-  )
-plot(permut_rfsrc_auc)
-```
+<!-- # Variable importance  -->
+<!-- permut_rfsrc_brier <- model_parts( -->
+<!--   rfsrc_exp, B = 10, type = "difference", -->
+<!--   loss_function = survex::loss_brier_score -->
+<!--   ) -->
+<!-- plot(permut_rfsrc_brier)  -->
+<!-- permut_rfsrc_auc <- model_parts( -->
+<!--   rfsrc_exp, B = 10, type = "difference", -->
+<!--   loss_function = survex::loss_one_minus_cd_auc -->
+<!--   ) -->
+<!-- plot(permut_rfsrc_auc) -->
+<!-- ``` -->
 

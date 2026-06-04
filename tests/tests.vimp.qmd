@@ -119,12 +119,15 @@ required for VIM computation:
 We define time horizons, maximum follow-up time and times at which to approximate integrals.
 
 ```{r}
-landmark_times <- quantile(time, c(0.25, 0.75))
+surv_fit <- survival::survfit(survival::Surv(time, event)~1)
+landmark_times <- quantile(surv_fit, 
+                           probs = c(#0.25, 
+                                     0.75))$quantile
+landmark_times
 approx_times <- sort(unique(c(0, time[event == 1], landmark_times)))
 approx_times <- approx_times[approx_times <= max(landmark_times)]
 length(approx_times)
 ```
-
 We generated cross-fitting and sample-splitting folds.
 
 ```{r}
@@ -518,15 +521,17 @@ kable(vim_stackG_scen2 %>%
 
 ### Cox-Aalen model
 
-```{r eval=FALSE}
+```{r}
 V0_cox_aalen_preds_scen2 <- CV_generate_full_predictions_landmark(
   time = time,
   event = event,
+  prop_vars = c("X3","X4"), 
   X = X,
   landmark_times = landmark_times,
   approx_times = approx_times,
   nuisance = "cox.aalen",
-  cf_folds = cf_folds)
+  cf_folds = cf_folds
+  )
 # str(V0_cox_aalen_preds_scen2)
 
 CV_full_preds <- V0_cox_aalen_preds_scen2$CV_full_preds

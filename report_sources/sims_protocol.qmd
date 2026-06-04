@@ -4,6 +4,11 @@ subtitle: "Simulation protocol"
 format: pdf
 ---
 
+```{r}
+library(tidyverse)
+library(knitr)
+```
+
 # Introduction
 
 We conducted a simulation study to examine the behavior of Wolock’s 
@@ -45,119 +50,90 @@ scenarios.
 
 # Data-generation mechanisms
 
-We simulated datasets combining DNA alterations and RNA pathway scores for 
-$i = 1, ..., n$ individuals.
+## Simulation of covariates 
 
-## DNA data simulation 
+We simulated datasets combining binary and continuous covariates for 
+$i = 1, \dots, n$ individuals.
 
-DNA pathways were modeled as correlated binary variables:
+### Binary covariates
 
-$$
-X_{ij} \in \{0,1\}, \quad j = 1,\dots,p,
-$$
-
-where $X_{ij} = 1$ indicates the presence of a DNA alteration.
-
-Each pathway had marginal prevalence
+Binary covariates were generated as correlated Bernoulli variables:
 
 $$
-\pi_j = P(X_{ij} = 1).
+X_{ij} \in \{0,1\}, \quad j = 1,\dots,p_B,
 $$
 
-To induce correlation between pathways, a latent Gaussian copula model was used:
+where $X_{ij}=1$ indicates the presence of binary feature $j$.
+
+Each variable had marginal prevalence
 
 $$
-\mathbf{Z}_i \sim \mathcal{N}(0, \Sigma),
+\pi_j = \Pr(X_{ij}=1).
 $$
 
-where $\Sigma_D$ is a block-structured correlation matrix.
+To induce correlation between variables, a latent Gaussian copula model was used:
+
+$$
+\mathbf{Z}_i \sim \mathcal{N}(0,\Sigma_B),
+$$
+
+where $\Sigma_B$ is a block-structured correlation matrix.
 
 Binary variables were obtained through probit thresholding:
 
 $$
-X_{ij} = \mathbf{1}\big(Z_{ij} < \Phi^{-1}(\pi_j)\big),
+X_{ij} =
+\mathbb{I}\left(
+Z_{ij} < \Phi^{-1}(\pi_j)
+\right),
 $$
 
-where $\Phi$ denotes the standard normal cumulative distribution function.  
-This guarantees
+where $\Phi^{-1}$ denotes the quantile function of the standard normal distribution. This construction guarantees
 
 $$
-P(X_{ij} = 1) = \pi_j.
+\Pr(X_{ij}=1)=\pi_j.
 $$
 
-$$
-t_j = \Phi^{-1}(\pi_j)
-$$
+Thus, marginal prevalences are exactly controlled while inducing dependence between binary variables through the latent correlation matrix.
 
-was applied, where $\pi_j$ denotes the marginal alteration prevalence and 
-$\Phi^{-1}$ is the inverse cumulative distribution function of the standard 
-normal distribution. 
-The observed binary variable was defined as:
+### Continuous covariates
+
+Continuous covariates were simulated from a multivariate normal distribution:
 
 $$
-X_j = \mathbb{I}(Z_j < t_j),
+\mathbf{W}_i \sim \mathcal{N}(0,\Sigma_C),
 $$
 
-which ensures that
+where $\Sigma_C \in \mathbb{R}^{p_C \times p_C}$ is a block-correlation matrix.
+
+Variables were partitioned into $K$ blocks of equal size $b$. For block $k$, define
 
 $$
-\Pr(X_j = 1) = \pi_j.
+B_k = \{(k-1)b+1,\dots,kb\}.
 $$
 
-This approach guarantees exact control of marginal prevalences while inducing 
-dependence between binary variables through the latent correlation matrix.
-
-## RNA data simulation
-
-RNA data were simulated as continuous pathway-level scores to mimic GSVA-like 
-enrichment scores.
-
-For each individual $i = 1, \dots, n$,
+The correlation matrix $\Sigma_C=(\sigma_{jl})$ was defined as
 
 $$
-\mathbf{X}_i \sim \mathcal{N}(0, \Sigma),
-$$
-
-where $\Sigma \in \mathbb{R}^{p \times p}$ is a block-correlation matrix 
-reflecting biological co-regulation between pathways.
-
-To reproduce GSVA outputs as used in practice, RNA scores were standardized 
-across samples
-
-## Block correlation structure 
-
-Pathways were partitioned into $K = 4$ blocks of equal size $b = 5$ 
-(so $p = 20$).  
-Let
-
-$$
-B_k = \{(k-1)b+1, \dots, kb\}, \quad k=1,\dots,4.
-$$
-
-The correlation matrix $\Sigma = (\sigma_{jk})$ was defined element-wise as
-
-$$
-\sigma_{jk} =
+\sigma_{jl} =
 \begin{cases}
-1 & \text{if } j = k, \\\\
-\rho_k & \text{if } j \neq k \text{ and } j,k \in B_\ell, \\\\
-\rho_B & \text{if } j \in B_\ell,\; k \in B_m,\; \ell \neq m.
+1 & \text{if } j=l, \\
+\rho_k & \text{if } j \neq l \text{ and } j,l \in B_k, \\
+\rho_B & \text{if } j \in B_k,\; l \in B_m,\; k \neq m.
 \end{cases}
 $$
 
 Equivalently, each diagonal block can be written as
 
 $$
-\Sigma_{X,k}=(1-\rho_k) I_b+\rho_k \mathbf{1}_b \mathbf{1}_b^\top,
+\Sigma_{C,k}
+=
+(1-\rho_k)I_b+\rho_k \mathbf{1}_b\mathbf{1}_b^\top,
 $$
 
-where $I_b$ denotes the $b \times b$ identity matrix and $\mathbf{1}_b$ is a 
-$b$-dimensional vector of ones.
+where $I_b$ denotes the $b \times b$ identity matrix and $\mathbf{1}_b$ is a vector of ones of length $b$.
 
-This structure induces strong positive co-regulation in block 1, moderate 
-positive correlation in block 3, weak correlation in block 4, and antagonistic 
-regulation (negative correlation) in block 2, thereby mimicking heterogeneous 
-biological pathway interactions.
+Continuous covariates were therefore correlated according to a block dependence structure.
 
 ## Simulation of time-to-event outcomes
 
@@ -168,26 +144,6 @@ $$Y=min(T,C), \quad \Delta = \mathbb{I}(T \le C).$$
 Censoring times were generated independently from an exponential distribution 
 to achieve a target censoring proportion.
 
-**Block effects versus pathway-specific effects**
-
-To differentiate structured group-level biological signals from individual 
-pathway-level heterogeneity, two distinct effect structures were considered in 
-the data-generating mechanism: **block effects** and 
-**pathway-specific effects**.
-
-**Block effects** represent shared signals operating at the level of correlated 
-pathway groups. Pathways were partitioned into predefined blocks reflecting 
-biological co-regulation. Within each block, a common regression coefficient was 
-assigned so that all pathways in the block contributed jointly to the prognostic 
-signal. Under this specification, the effect operates at the group level, 
-inducing a coherent association between correlated pathways and the outcome. 
-
-**Pathway-specific effects** allow each pathway to contribute independently to 
-the outcome through its own regression coefficient. This formulation permits 
-heterogeneous effect sizes within correlated blocks and enables scenarios in 
-which only a subset of pathways within a block is truly associated with the 
-outcome. 
-
 **Additive Aalen model**
 
 Time-to-event outcomes were generated under an additive hazards framework.  
@@ -195,11 +151,11 @@ For each individual $i = 1, \dots, n$, with covariate vector
 $\mathbf{X}_i$, the hazard function was defined as
 
 $$
-\lambda(t \mid \mathbf{X}_i) = \lambda_0(t) + \mathbf{X}_i^\top \boldsymbol{\beta},
+\lambda(t \mid X_i) = \lambda_0(t) + X_i^\top \alpha,
 $$
 
 where $\lambda_0(t)$ denotes the baseline hazard function and 
-$\boldsymbol{\beta}$ represents the vector of additive hazard effects.
+$\alpha$ represents the vector of additive hazard effects.
 
 **Cox-Aalen model**
 
@@ -207,15 +163,15 @@ To evaluate performance under mixed hazard structures, we additionally
 generated data from a Cox-Aalen model:
 
 $$
-\lambda(t|X_{add},X_{mult})=\lambda_0 \exp(X_{i,mult}^\top\beta_{mult})+X_{i,add} ^\top\beta_{add}.
+\lambda(t|X_i,Z_i)=\lambda_0 \exp(Z_{i}^\top\beta)+X_{i} ^\top\alpha.
 $$
 
 where:
 
-* $X_{mult}$ are covariates with multiplicative effects, 
-* $\beta_{mult}$ are multiplicative coefficients,
-* $X_{i,add}$ are covariates with additive effects, 
-* $\beta_{add}$ are additive coefficients 
+* $Z_{i}$ are covariates with multiplicative effects, 
+* $\beta$ are multiplicative coefficients,
+* $X_{i}$ are covariates with additive effects, 
+* $\alpha$ are additive coefficients 
 
 # Target estimands and oracle variable importance 
 
@@ -249,7 +205,7 @@ strategies, depending on the scenario:
 * Aalen model (`timereg::aalen()`, `pec::predictSurvProb()`)
 * Cox-Aalen survival model (`timereg::cox.aalen()`, `pec::predictSurvProb()`) 
 * Random survival forests (`randomForestSRC::rfsrc()`) 
-* Survival Super Learner (`survSuperLearner`, `survivalSL`) 
+* Survival Super Learner (`survivalSL`) 
 * Global survival stacking (`survML::stackG()`)
 
 **Estimation of the oracle prediction functions**
@@ -293,20 +249,14 @@ function after the variable values permutations:
 
 ## Time horizon 
 
-Variable importance was evaluated at a two fixed time horizons, corresponding to 
-the **25th** and **75th percentiles** of the empirical observed event times (or 
-the Kaplan-Meier estimator to account for censoring). These represent an 
-early-risk and  a late-risk horizon, respectively. Restricting the analysis to 
-two quantile-based time points reduces computational burden while ensuring that 
-evaluation occurs in regions with a sufficient number of individuals at risk, 
+Variable importance was evaluated at a fixed time horizon, corresponding to **75th percentiles** of the empirical observed event times (or 
+the Kaplan-Meier estimator to account for censoring). These represent a late-risk horizon Restricting the analysis to this quantile-based time point reduces computational burden while ensuring that evaluation occurs in regions with a sufficient number of individuals at risk, 
 thereby avoiding instability in the tail of the distribution.
 
 ## Performance metrics for variable importance in survival analysis 
 
-Variable importance was evaluated using the *Brier score*, $BS(t)$ to captures 
-both discrimination and calibration. We additionally used the 
-*cumulative/dynamic area under the ROC curve,* $AUC(t)$ to estimate variable 
-importance measures, which evaluate discrimination independently of calibration. 
+Variable importance was evaluated using the *Brier score*, $BS(t)$ to captures both discrimination and calibration. We additionally used the 
+*cumulative/dynamic area under the ROC curve,* $AUC(t)$ to estimate variable importance measures, which evaluate discrimination independently of calibration. 
 
 The ***cumulative/dynamique AUC*** at time $t$ is defined as the probabilitu 
 that, among a randomly selected pair consisting of one individual who experiences 
@@ -319,11 +269,9 @@ with inverse probability of censoring weights to account for right censoring.
 
 ## Cross-validation procedure 
 
-To ensure fair comparison across nuisance estimation strategies, all models were 
-evaluated using the same cross-validation framework.
+To ensure fair comparison across nuisance estimation strategies, all models were evaluated using the same cross-validation framework.
 
-Five-fold cross-validation was employed for out-of-sample performance assessment
-and to prevent optimistic bias in risk prediction and downstream VIM estimation.
+Five-fold cross-validation was employed for out-of-sample performance assessment and to prevent optimistic bias in risk prediction and downstream VIM estimation.
 
 We implemented $K$-fold cross-validation with $K=5$. The data were randomly 
 partitioned into five approximately equal folds. For each fold:
@@ -339,8 +287,7 @@ validation risk estimation.
 ## Oracle variable importance  
 
 We generated a large Monte Carlo sample ($n=200 000$) from the true 
-data-generating model to approximate population-level quantities. Using this 
-sample, we computed the oracle predictive performance as well as the oracle 
+data-generating model to approximate population-level quantities. Using this sample, we computed the oracle predictive performance as well as the oracle 
 VIM measure for each pathway or group of pathways.
 
 # Performance evaluation
@@ -368,6 +315,32 @@ where:
 
 # Simulation scenarios 
 
+The main scenarios are summarized in @tbl-scen. 
+
+```{r}
+#| label: "tbl-scen"
+#| tbl-cap: "Summary of the main scenarios"
+
+tbl_scen <- tibble(
+  scenario_id = 1:2,
+  hazards = c("Additive hazards (Aalen model)",
+              "Mixed additive and multiplicative hazards (Cox-Aalen model)"),
+  # p = c(4, 6),
+  var_sim = c("$X_1 \\sim Bernoulli(0.4)$ <br> $X_2$ <br> $X_3$ <br> $X_4$",
+              "$X_1$ <br> $X_2$ <br> $X_3$ <br> $Z_1$ <br> $Z_2$ <br> $Z_3$"),
+  coef = c(paste("$\\alpha_{1}=0.1$ <br> $\\alpha_{2}=0.05$ <br>",
+                 "$\\alpha_{3}=0.005$ <br> $\\alpha_{4}=0$"),
+           paste("$\\alpha_{1}=0.1$ <br> $\\alpha_{2}=0.05$ <br> $\\alpha_{3}=0$",
+                 "<br> $\\beta_{1}=1$ <br> $\\beta_{2}=0.5$ <br> $\\beta_{3}=0$")),
+  nuisance = c("Aalen model <br> Survival Super Learner <br> Global survival stacking",
+               "Cox-Aalen model <br> Survival Super Learner <br> Global survival stacking")
+  
+)
+kable(tbl_scen, col.names = c("Scenario n°", "Effect type",# "$p$",
+                              "Simulation of covariates", "Coefficient", 
+                              "Nuisance function estimation"))
+```
+
 ## Scenario 1 - Additive hazards (baseline benchmark) 
 
 **Objective**
@@ -381,15 +354,14 @@ an **additive hazards model**.
 **Data generating mechanism**
 
 Four binary covariates were generated *independently* with prevalences spanning 
-rare to frequent alterations, $X_j \sim Bernoulli(0.4)$ with 
-$\pi_j =(0.005, 0.02, 0.05, 0.20)$. 
+rare to frequent alterations, $X_j \sim Bernoulli(0.4)$. 
 
 Events times were simulated under the following time-constant additive hazards 
 model: 
 
-$$\lambda(t|x)=\lambda_0(t)+\beta_{1}(t)X_{1}+\beta_{2}(t)X_{2}+\beta_{3}(t)X_{3}+\beta_{4}(t)X_{4}$$
+$$\lambda(t|x)=\lambda_0(t)+\alpha_{1}(t)X_{1}+\alpha_{2}(t)X_{2}+\alpha_{3}(t)X_{3}+\alpha_{4}(t)X_{4}$$
 
-with $\lambda_0(t)=0.05$ (constant) and $\beta_j(t)=(0.06, 0.02, 0.005, 0)$. 
+with $\lambda_0(t)=0.05$ (constant) and $\alpha_j(t)=(0.1, 0.05, 0.005, 0)$. 
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
@@ -403,7 +375,7 @@ We compare the following approaches for estimating the nuisance functions
 required for VIM computation:
 
 * Aalen additive hazards model (`timereg::aalen`)
-* Survival Super Learner (`survSuperLearner`)
+* Survival Super Learner (`survivalSL`)
 * Global survival stacking (`survML`)
 
 Since the data-generating mechanism follows an additive hazards model,
@@ -423,17 +395,18 @@ hazard follows a **Cox-Aalen model**.
 
 The covariates are generated *independently* as follows:
 
-* $X = (X_{1}, X_{2}, X_{3}, X_{4})$
-* $X_{1}, X_{2} \sim \mathcal{B}(0.4)$
-* $X_{3}, X_{4} \sim \mathcal{N}(0,1)$
+* $X = (X_{1}, X_{2}, X_{3}, Z_{1}, Z_{2}, Z_{3})$
+* $X_{1}, X_{2}, X_{3} \sim \mathcal{B}(0.4)$
+* $Z_{1}, Z_{2} \sim \mathcal{B}(0.4)$
+* $Z_{3} \sim \mathcal{N}(0,1)$
 
 To generate mixed additive and multiplicative effects, event times were 
 simulated under a Cox-Aalen model with constant baseline hazard: 
-$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$ and $X_3$ with 
-coefficients $\beta_{1}(t)=0.06$ and $\beta_{3}(t)=0.005$, respectively. 
-Multiplicative (proportional hazards) effects were assigned to 
-$X_2$ and $X_4$ with coefficients $\beta_{2}=0.5$ and
-$\beta_{4}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
+$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$, $X_2$ and $X_3$ 
+with coefficients $\alpha_{1}(t)=0.1$, $\alpha_{2}=0.05$ and $\alpha_{3}(t)=0$, 
+respectively. Multiplicative (proportional hazards) effects were assigned to 
+$X_1$, $X_2$ and $X_3$ with coefficients $\beta_{1}=1$, $\beta_{2}=0.5$ and
+$\beta_{3}=0$. 
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
@@ -447,17 +420,17 @@ We compare the following approaches for estimating the nuisance functions
 required for VIM computation:
 
 * Cox-Aalen model (`timereg::cox.aalen`)
-* Survival Super Learner (`survSuperLearner`)
+* Survival Super Learner (`survivalSL`)
 * Global survival stacking (`survML`)
 
-## Scenario 3 -  Rare genomic alterations with mixed effects under proportional hazards
+## Scenario 3 -  Rare alterations with 
 
 **Objective**
 
 This scenario aims to evaluate the overall performance of the VIM procedure to ***rare alterations*** exhibiting ***heterogeneous effect sizes (ranging from weak to strong)*** under a ***proportional hazards model***. More specifically, the objective is to assess whether the VIM approach can:
 
 * detect rare yet highly prognostic alterations,
-* discriminate between weak and strong prognostic signals, and
+* discriminate between strong and moderate prognostic signals, and
 * correctly identify non-informative (null) variables.
 
 **Data-generating mechanisms**
@@ -466,48 +439,31 @@ All covariates were generated independently as binary variables:
 
 $$X_j \sim \mathcal{B}(\pi_j)$$ with $\pi \in {\{0.01, 0.1\}}$ to reflect genomic rarity. 
 
-The event times follows a proportional hazards model with a with constant baseline hazard $\lambda_0(t) = 0.1$ such that
-
-$$
-\lambda(t \mid X) = \lambda_0(t)\exp(X^\top \beta).
-$$
+The event times follows a Aalen or Cox-Aalen model (cf. scenario 1 and 2).
 
 Covariates were partitioned according to both their prevalence and prognostic effect size, resulting in the following combinations:
 
 ```{r}
 knitr::kable(
   data.frame(
-    `Alteration frequency` = c(
-      rep("Very rare ($\\pi = 0.01$)", 5),
-      rep("Rare ($\\pi = 0.10$)", 5)
+    prev_category = c(
+      rep("Very rare", 3),
+      rep("Rare", 3)
     ),
-    `Effect category` = c(
-      "Strong", "Strong", "Moderate", "Weak", "Null",
-      "Strong", "Strong", "Moderate", "Weak", "Null"
-    ),
-    `Hazard ratio` = c(
-      3.0, 2.0, 1.5, 1.2, 1.0,
-      3.0, 2.0, 1.5, 1.2, 1.0
-    ),
-    `Regression coefficient` = c(
-      "$\\log(3)$",
-      "$\\log(2)$",
-      "$\\log(1.5)$",
-      "$\\log(1.2)$",
-      "$0$",
-      "$\\log(3)$",
-      "$\\log(2)$",
-      "$\\log(1.5)$",
-      "$\\log(1.2)$",
-      "$0$"
-    )
+    prev = c(
+      rep("$\\pi = 0.01$", 3),
+      rep("$\\pi = 0.10$", 3)),
+    effect = rep(c("Strong", "Moderate", "Null"), 2),
+    alpha = rep(c(0.1, 0.05, 0), 2),
+    beta = rep(c(1, 0.5, 0), 2)
   ),
   escape = FALSE,
-  align = "llcc"
+  align = "llcc",
+  col.names = c("Prevalence category","$\\pi_j$","Effect category","$\\alpha$","$\\beta$")
 )
 ```
 
-This design allows us to assess whether the VIM procedure can detect rare but strongly prognostic alterations, distinguish weak from moderate and strong effects, and correctly assign low importance to null variables.
+This design allows us to assess whether the VIM procedure can detect rare but strongly prognostic alterations, distinguish strong from moderate effects, and correctly assign low importance to null variables.
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the data-generating mechanism to achieve an expected censoring proportion of approximately 20%, and the calibrated value was then fixed across all 
 simulation replicates. 
@@ -531,7 +487,6 @@ across the considered scenarios.
 
 **Scenarios**
 
-- Rare genomic alterations 
 - Additive hazards 
 - Mixed additive and multiplicative hazards 
 

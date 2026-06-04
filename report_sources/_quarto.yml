@@ -1,0 +1,8 @@
+project:
+  output-dir: ../docs
+render: 
+  - sims_protocol.qmd
+execute: 
+  echo: false
+warning: false
+# bibliography: ../../references.bib

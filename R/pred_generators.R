@@ -1,6 +1,7 @@
 
 generate_full_predictions <- function(time,
                                       event,
+                                      prop_vars = NULL, 
                                       X,
                                       X_holdout, 
                                       landmark_times,
@@ -50,9 +51,42 @@ generate_full_predictions <- function(time,
   
   }
   
-  # else if (nuisance == "cox.aalen"){
-  #   
-  # }
+  else if (nuisance == "cox.aalen"){
+    
+    x_vars <- colnames(X)
+    prop_vars <- intersect(x_vars, prop_vars)
+    add_vars  <- setdiff(x_vars, prop_vars)
+    
+    rhs <- c(
+      if (length(prop_vars) > 0) paste0("prop(", prop_vars, ")"),
+      add_vars
+    )
+    
+    formS <- as.formula(
+      paste("survival::Surv(time, event) ~", paste(rhs, collapse = " + "))
+    )
+    
+    formG <- as.formula(
+      paste("survival::Surv(time, cens_event) ~", paste(rhs, collapse = " + "))
+    )
+    
+    # Event model: S(t|X) 
+    datS <- data.frame(time = time, event = event, X)
+    S_fit <- timereg::cox.aalen(formS, data = datS)
+    
+    # Censoring model: G(t|X) 
+    cens_event <- 1 - event
+    datG <- data.frame(time = time, cens_event = cens_event, X)
+    G_fit       <- timereg::cox.aalen(formG, data = datG)
+  
+    S_hat       <- pec::predictSurvProb(S_fit, newdata = X_holdout, times = approx_times)
+    G_hat       <- pec::predictSurvProb(G_fit, newdata = X_holdout, times = approx_times)
+    f_hat       <- S_hat[,which(approx_times %in% landmark_times),drop=FALSE]
+    S_hat_train <- pec::predictSurvProb(S_fit, newdata = X, times = approx_times)
+    G_hat_train <- pec::predictSurvProb(G_fit, newdata = X, times = approx_times)
+    f_hat_train <- S_hat_train[,which(approx_times %in% landmark_times),drop=FALSE]
+
+  }
   # 
   # else if (nuisance == "survivalSL"){
   #   
@@ -91,6 +125,7 @@ generate_reduced_predictions <- function(f_hat,
 
 CV_generate_full_predictions_landmark <- function(time,
                                                   event,
+                                                  prop_vars = NULL, 
                                                   X,
                                                   landmark_times,
                                                   approx_times,
@@ -107,8 +142,10 @@ CV_generate_full_predictions_landmark <- function(time,
     full_preds <- generate_full_predictions(
       time = time[train_id],
       event = event[train_id],
+      prop_vars = prop_vars, 
       X = X[train_id, , drop = FALSE],
       X_holdout = X[test_id, , drop = FALSE],
+      
       landmark_times = landmark_times,
       approx_times = approx_times,
       nuisance = nuisance

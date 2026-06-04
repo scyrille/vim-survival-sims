@@ -6,3 +6,6 @@ execute:
   echo: false
 warning: false
 # bibliography: ../../references.bib
+crossref: 
+  tbl-title: "Table"
+  fig-title: "Figure"

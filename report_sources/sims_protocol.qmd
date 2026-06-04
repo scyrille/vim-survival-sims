@@ -654,14 +654,14 @@ SuperLearner::listWrappers()
 **Random survival forests** 
 
 ```{r}
-library(randomForestSRC)
+# library(randomForestSRC)
 ```
 
 **Ensemble methods for survival function estimation with time-varying covariates** (`LTRCforests`) 
 
 ```{r}
 # devtools::install_github("weichiyao/LTRCforests")
-library(LTRCforests)
+# library(LTRCforests)
 ```
 
 # References 

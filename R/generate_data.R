@@ -48,7 +48,7 @@ generate_block_corr <- function(p = 20,
 #' @return A data.frame with `p` binary variables named `X1, ..., Xp`.
 #'
 #' @export
-simulate_dna_pathways <- function(n, 
+simulate_binary <- function(n, 
                                   prev, 
                                   Sigma){
   
@@ -80,10 +80,10 @@ simulate_dna_pathways <- function(n,
 #' @return A standardized matrix (n × p) of RNA pathway scores
 #' 
 #' @export
-simulate_rna_pathways <- function(n,
-                                  p = 20,
-                                  mu = 0, 
-                                  Sigma) {
+simulate_continuous <- function(n,
+                                p = 20,
+                                mu = 0, 
+                                Sigma) {
   
   # --- Multivariate normal simulation ---
   raw_scores <- MASS::mvrnorm(n = n,
@@ -160,28 +160,28 @@ simulate_cox_data <- function(n, prev, sigma, lambda0, beta, c_max) {
 #' @param sigma Numeric `p x p` correlation (or covariance) matrix for the
 #'   latent Gaussian variables.
 #' @param lambda0 Numeric. Constant baseline hazard in the additive hazards model.
-#' @param beta Numeric vector of additive regression coefficients.
+#' @param alpha Numeric vector of additive regression coefficients.
 #' @param c_max Numeric. Maximum censoring time. Independent censoring
 #'   times are generated as C ~ Uniform(0, c_max).
 #'
 #' @return A data.frame containing observed time, event indicator and covariates.
 #'
 #' @export
-simulate_aalen_data <- function(n, prev, sigma, lambda0, beta, c_max) {
+simulate_aalen_data <- function(n, prev, sigma, lambda0, alpha, c_max) {
   
   p <- length(prev)
   
-  stopifnot(length(beta) == p)
+  stopifnot(length(alpha) == p)
   stopifnot(is.numeric(prev), all(prev > 0 & prev < 1))
   stopifnot(is.matrix(sigma), all(dim(sigma) == c(p, p)))
   stopifnot(c_max > 0)
   
   # Theoretical positivity check for binary covariates
-  min_lambda <- lambda0 + sum(beta[beta < 0])
+  min_lambda <- lambda0 + sum(alpha[alpha < 0])
   if (min_lambda <= 0) {
     stop(
       "The additive hazard can be non-positive for some covariate patterns. ",
-      "Increase lambda0 or modify beta."
+      "Increase lambda0 or modify alpha."
     )
   }
   
@@ -197,12 +197,12 @@ simulate_aalen_data <- function(n, prev, sigma, lambda0, beta, c_max) {
   colnames(X) <- paste0("X", seq_len(p))
   
   # Event times from exponential with individual rate lambdaX
-  lambdaX <- as.vector(lambda0 + X %*% beta)
+  lambdaX <- as.vector(lambda0 + X %*% alpha)
   
   if (any(lambdaX <= 0)) {
     stop(
       "Some sampled values of the additive hazard are <= 0. ",
-      "Increase lambda0 or modify beta."
+      "Increase lambda0 or modify alpha."
     )
   }
   
@@ -224,8 +224,8 @@ simulate_aalen_data <- function(n, prev, sigma, lambda0, beta, c_max) {
 #'
 #' @param n Integer. Sample size.
 #' @param lambda0 Constant baseline hazard in the additive part.
-#' @param beta_add Numeric vector of additive regression coefficients.
-#' @param beta_mult Numeric vector of multiplicative regression coefficients.
+#' @param alpha Numeric vector of additive regression coefficients.
+#' @param beta Numeric vector of multiplicative regression coefficients.
 #' @param prev_add Numeric vector with marginal prevalences of additive binary covariates.
 #' @param sigma_add Numeric correlation/covariance matrix for the latent Gaussian
 #'   variables used to generate additive binary covariates.
@@ -242,8 +242,8 @@ simulate_aalen_data <- function(n, prev, sigma, lambda0, beta, c_max) {
 #' @export
 simulate_cox_aalen_data <- function(n,
                                     lambda0,
-                                    beta_add,
-                                    beta_mult,
+                                    alpha,
+                                    beta,
                                     prev_add,
                                     sigma_add,
                                     prev_mult,
@@ -258,8 +258,8 @@ simulate_cox_aalen_data <- function(n,
   p_mult_cont <- length(mean_mult)
   p_mult <- p_mult_bin + p_mult_cont
   
-  stopifnot(length(beta_add) == p_add)
-  stopifnot(length(beta_mult) == p_mult)
+  stopifnot(length(alpha) == p_add)
+  stopifnot(length(beta) == p_mult)
   stopifnot(is.matrix(sigma_add), all(dim(sigma_add) == c(p_add, p_add)))
   stopifnot(is.matrix(sigma_mult_bin), all(dim(sigma_mult_bin) == c(p_mult_bin, p_mult_bin)))
   stopifnot(is.matrix(sigma_mult_cont), all(dim(sigma_mult_cont) == c(p_mult_cont, p_mult_cont)))
@@ -292,16 +292,16 @@ simulate_cox_aalen_data <- function(n,
   ## Combine multiplicative covariates
   X_mult <- cbind(X_mult_bin, X_mult_cont)
   X_mult <- as.matrix(X_mult)
-  colnames(X_mult) <- paste0("X", seq(p_add + 1, p_add + p_mult))
+  colnames(X_mult) <- paste0("Z", seq_len(p_mult))
   
   # --------- Hazard components --------- #
-  add_part <- as.vector(lambda0 + X_add %*% beta_add)
+  add_part <- as.vector(lambda0 + X_add %*% alpha)
   
   if (any(add_part <= 0)) {
-    stop("Some values of the additive part are <= 0. Increase lambda0 or modify beta_add.")
+    stop("Some values of the additive part are <= 0. Increase lambda0 or modify alpha.")
   }
   
-  lambda_i <- as.vector(exp(X_mult %*% beta_mult) * add_part)
+  lambda_i <- as.vector(exp(X_mult %*% beta) * add_part)
   
   # --------- Event times --------- #
   U <- runif(n)
@@ -403,7 +403,7 @@ calibrate_c_max_cox <- function(
 #'
 #' @param n_cal Integer. Number of individuals used in the Monte Carlo calibration step.
 #' @param lambda0 Numeric. Constant baseline hazard.
-#' @param beta Numeric vector of additive regression coefficients.
+#' @param alpha Numeric vector of additive regression coefficients.
 #' @param prev Numeric vector of marginal prevalences of the binary covariates.
 #' @param Sigma Numeric correlation/covariance matrix for the latent Gaussian variables.
 #' @param target_cens Numeric. Desired censoring proportion.
@@ -419,7 +419,7 @@ calibrate_c_max_cox <- function(
 calibrate_c_max_aalen <- function(
     n_cal = 200000,
     lambda0 = 0.05,
-    beta = c(0.06, 0.02, 0.005, 0),
+    alpha = c(0.06, 0.02, 0.005, 0),
     prev = c(0.005, 0.02, 0.05, 0.20),
     sigma,
     target_cens = 0.20,
@@ -430,17 +430,17 @@ calibrate_c_max_aalen <- function(
   
   p <- length(prev)
   
-  stopifnot(length(beta) == p)
+  stopifnot(length(alpha) == p)
   stopifnot(is.numeric(prev), all(prev > 0 & prev < 1))
   stopifnot(is.matrix(sigma), all(dim(sigma) == c(p, p)))
   stopifnot(target_cens > 0, target_cens < 1)
   
   # Theoretical positivity check for binary covariates
-  min_lambda <- lambda0 + sum(beta[beta < 0])
+  min_lambda <- lambda0 + sum(alpha[alpha < 0])
   if (min_lambda <= 0) {
     stop(
       "The additive hazard can be non-positive for some covariate patterns. ",
-      "Increase lambda0 or modify beta."
+      "Increase lambda0 or modify alpha."
     )
   }
   
@@ -456,12 +456,12 @@ calibrate_c_max_aalen <- function(
   colnames(X) <- paste0("X", seq_len(p))
   
   # ------ Individual hazards ----- #
-  lambdaX <- as.vector(lambda0 + X %*% beta)
+  lambdaX <- as.vector(lambda0 + X %*% alpha)
   
   if (any(lambdaX <= 0)) {
     stop(
       "Some sampled values of the additive hazard are <= 0. ",
-      "Increase lambda0 or modify beta."
+      "Increase lambda0 or modify alpha."
     )
   }
   
@@ -496,8 +496,8 @@ calibrate_c_max_aalen <- function(
 #'
 #' @param n_cal Integer. Number of individuals used in the Monte Carlo calibration step.
 #' @param lambda0 Constant baseline hazard in the additive part.
-#' @param beta_add Numeric vector of additive regression coefficients.
-#' @param beta_mult Numeric vector of multiplicative regression coefficients.
+#' @param alpha Numeric vector of additive regression coefficients.
+#' @param beta Numeric vector of multiplicative regression coefficients.
 #' @param prev_add Numeric vector with marginal prevalences of additive binary covariates.
 #' @param sigma_add Numeric correlation/covariance matrix for the latent Gaussian
 #'   variables used to generate additive binary covariates.
@@ -516,8 +516,8 @@ calibrate_c_max_aalen <- function(
 calibrate_c_max_cox_aalen <- function(
     n_cal = 200000,
     lambda0,
-    beta_add,
-    beta_mult,
+    alpha,
+    beta,
     prev_add,
     sigma_add,
     prev_mult,
@@ -536,8 +536,8 @@ calibrate_c_max_cox_aalen <- function(
   p_mult_cont <- length(mean_mult)
   p_mult <- p_mult_bin + p_mult_cont
   
-  stopifnot(length(beta_add) == p_add)
-  stopifnot(length(beta_mult) == p_mult)
+  stopifnot(length(alpha) == p_add)
+  stopifnot(length(beta) == p_mult)
   stopifnot(is.matrix(sigma_add), all(dim(sigma_add) == c(p_add, p_add)))
   stopifnot(is.matrix(sigma_mult_bin), all(dim(sigma_mult_bin) == c(p_mult_bin, p_mult_bin)))
   stopifnot(is.matrix(sigma_mult_cont), all(dim(sigma_mult_cont) == c(p_mult_cont, p_mult_cont)))
@@ -546,12 +546,12 @@ calibrate_c_max_cox_aalen <- function(
   # ---------- Quick theoretical positivity check ---------- #
   # Since X_add is binary, the minimum possible additive part is obtained
   # when all covariates with negative coefficients are equal to 1.
-  min_add_theoretical <- lambda0 + sum(beta_add[beta_add < 0])
+  min_add_theoretical <- lambda0 + sum(alpha[alpha < 0])
   
   if (min_add_theoretical <= 0) {
     stop(
       "The additive part can be non-positive for some binary covariate patterns. ",
-      "Increase lambda0 or modify beta_add."
+      "Increase lambda0 or modify alpha."
     )
   }
   
@@ -593,16 +593,16 @@ calibrate_c_max_cox_aalen <- function(
   X_mult <- as.matrix(X_mult)
   
   # ---------- Individual hazards ---------- #
-  add_part <- as.vector(lambda0 + X_add %*% beta_add)
+  add_part <- as.vector(lambda0 + X_add %*% alpha)
   
   if (any(add_part <= 0)) {
     stop(
       "Some sampled values of the additive part are <= 0. ",
-      "Increase lambda0 or modify beta_add."
+      "Increase lambda0 or modify alpha."
     )
   }
   
-  lambda_i <- as.vector(exp(X_mult %*% beta_mult) * add_part)
+  lambda_i <- as.vector(exp(X_mult %*% beta) * add_part)
   
   # ---------- Event times ---------- #
   U <- runif(n_cal)

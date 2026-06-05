@@ -184,18 +184,18 @@ estimands: exclusion importance and permutation importance.
 
 We consider the model-agnostic variable importance measure proposed by Wolock 
 *et al.*, defined through covariate exclusion. For a given prediction time $t_0$ 
-and covariate $X_j$, the VIM quantifies the change in predictive performance 
+and covariate $X_s$, the VIM quantifies the change in predictive performance 
 when $X_j$ is removed from the prediction function. 
 
 We defined a nonparametric variable importance measure (VIM) based on the 
-predictive value of a pathway set within a flexible survival prediction model 
+predictive value of a variable set within a flexible survival prediction model 
 fitted with `survML`. Let $V(.)$ denote a time-dependent predictive performance 
 functional, evaluated on predictions. The variable importance measure for 
 covariate $X_j$ at time $t_0$, $\psi_j(t_0)$, was defined as the difference in 
 predictive performance between a model fit using the full feature set, 
-$V_{full}$ and a model fit after excluding the pathway or group of pathways of 
+$V_{full}$ and a model fit after excluding the variable or group of variables of 
 interest, $V_{reduced}$:
-$$\psi_j(P_0) = V_{full} - V_{reduced}$$
+$$\psi_{X_j}(P_0) = V_{full} - V_{reduced}$$
 
 **Estimation of the conditional survival functions**
 
@@ -258,14 +258,14 @@ thereby avoiding instability in the tail of the distribution.
 Variable importance was evaluated using the *Brier score*, $BS(t)$ to captures both discrimination and calibration. We additionally used the 
 *cumulative/dynamic area under the ROC curve,* $AUC(t)$ to estimate variable importance measures, which evaluate discrimination independently of calibration. 
 
+The ***Brier score*** at time $t$ is the expected squared difference between the 
+observed survival status at time $t$ and the predicted survival probability, 
+with inverse probability of censoring weights to account for right censoring. 
+
 The ***cumulative/dynamique AUC*** at time $t$ is defined as the probabilitu 
 that, among a randomly selected pair consisting of one individual who experiences 
 the event before $t$ and one who survives beyon $t$, the predicted risk is 
 higher for the former. 
-
-The ***Brier score*** at time $t$ is the expected squared difference between the 
-observed survival status at time $t$ and the predicted survival probability, 
-with inverse probability of censoring weights to account for right censoring. 
 
 ## Cross-validation procedure 
 
@@ -288,7 +288,7 @@ validation risk estimation.
 
 We generated a large Monte Carlo sample ($n=200 000$) from the true 
 data-generating model to approximate population-level quantities. Using this sample, we computed the oracle predictive performance as well as the oracle 
-VIM measure for each pathway or group of pathways.
+VIM measure for each variables.
 
 # Performance evaluation
 
@@ -315,7 +315,7 @@ where:
 
 # Simulation scenarios 
 
-The main scenarios are summarized in @tbl-scen. 
+The main scenarios of the simulation study are summarized in @tbl-scen. 
 
 ```{r}
 #| label: "tbl-scen"
@@ -326,12 +326,22 @@ tbl_scen <- tibble(
   hazards = c("Additive hazards (Aalen model)",
               "Mixed additive and multiplicative hazards (Cox-Aalen model)"),
   # p = c(4, 6),
-  var_sim = c("$X_1 \\sim Bernoulli(0.4)$ <br> $X_2$ <br> $X_3$ <br> $X_4$",
-              "$X_1$ <br> $X_2$ <br> $X_3$ <br> $Z_1$ <br> $Z_2$ <br> $Z_3$"),
-  coef = c(paste("$\\alpha_{1}=0.1$ <br> $\\alpha_{2}=0.05$ <br>",
-                 "$\\alpha_{3}=0.005$ <br> $\\alpha_{4}=0$"),
-           paste("$\\alpha_{1}=0.1$ <br> $\\alpha_{2}=0.05$ <br> $\\alpha_{3}=0$",
-                 "<br> $\\beta_{1}=1$ <br> $\\beta_{2}=0.5$ <br> $\\beta_{3}=0$")),
+  var_sim = c("$X_1, X_2, X_3, X_4 \\sim Bernoulli(0.4)$", 
+              paste("$X_1, X_2, X_3, Z_1, Z_2 \\sim Bernoulli(0.4)$",
+                    "$Z_3 \\sim N(0,1)$",
+                    sep ="<br>")),
+  coef = c(paste("$\\alpha_{1}=0.1$ (strong effect)", 
+                 "$\\alpha_{2}=0.05$ (moderate effect)",
+                 "$\\alpha_{3}=0.005$ (weak effect)",
+                 "$\\alpha_{4}=0$ (null effect)",
+                 sep = "<br>"),
+           paste("$\\alpha_{1}=0.1$ (strong effect)",
+                 "$\\alpha_{2}=0.05$ (moderate effect)",
+                 "$\\alpha_{3}=0$ (null effect)",
+                 "$\\beta_{1}=1$ (strong effect)",
+                 "$\\beta_{2}=0.5$ (moderate effect)",
+                 "$\\beta_{3}=0$ (null effect)",
+                 sep = "<br>")),
   nuisance = c("Aalen model <br> Survival Super Learner <br> Global survival stacking",
                "Cox-Aalen model <br> Survival Super Learner <br> Global survival stacking")
   
@@ -341,7 +351,7 @@ kable(tbl_scen, col.names = c("Scenario n°", "Effect type",# "$p$",
                               "Nuisance function estimation"))
 ```
 
-## Scenario 1 - Additive hazards (baseline benchmark) 
+## Scenario 1 - Additive hazards 
 
 **Objective**
 
@@ -423,11 +433,13 @@ required for VIM computation:
 * Survival Super Learner (`survivalSL`)
 * Global survival stacking (`survML`)
 
-## Scenario 3 -  Rare alterations with 
+## Additional numerical experiments 
+
+### Sensitivity to low prevalence
 
 **Objective**
 
-This scenario aims to evaluate the overall performance of the VIM procedure to ***rare alterations*** exhibiting ***heterogeneous effect sizes (ranging from weak to strong)*** under a ***proportional hazards model***. More specifically, the objective is to assess whether the VIM approach can:
+This scenario aims to evaluate the overall performance of the VIM procedure to ***rare alterations*** exhibiting ***heterogeneous effect sizes (ranging from null to strong)*** under ***additive*** and a mixed additive and multiplicative hazards. More specifically, the objective is to assess whether the VIM approach can:
 
 * detect rare yet highly prognostic alterations,
 * discriminate between strong and moderate prognostic signals, and
@@ -441,7 +453,7 @@ $$X_j \sim \mathcal{B}(\pi_j)$$ with $\pi \in {\{0.01, 0.1\}}$ to reflect genomi
 
 The event times follows a Aalen or Cox-Aalen model (cf. scenario 1 and 2).
 
-Covariates were partitioned according to both their prevalence and prognostic effect size, resulting in the following combinations:
+Covariates were partitioned according to both their prevalence and prognostic effect size, resulting in the following combinations :
 
 ```{r}
 knitr::kable(
@@ -468,7 +480,7 @@ This design allows us to assess whether the VIM procedure can detect rare but st
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the data-generating mechanism to achieve an expected censoring proportion of approximately 20%, and the calibrated value was then fixed across all 
 simulation replicates. 
 
-## Sensitivity to covariate correlations 
+### Sensitivity to covariate correlations 
 
 For each scenario, we additionally evaluated the sensitivity of the VIM to 
 correlations between covariates. Correlations were introduced between selected 
@@ -478,7 +490,7 @@ between predictors, with pairwise correlations set to $\rho=0.3$ and $\rho=0.6$,
 respectively. This analysis allows us to assess the robustness of the estimated 
 VIM in the presence of correlated covariates. 
 
-## Compare exclusion variable importance to permutation variable importance
+### Compare exclusion variable importance to permutation variable importance
 
 **Objective**
 
@@ -492,176 +504,61 @@ across the considered scenarios.
 
 ## True values of variable importance for all scenarios 
 
-The approximate true values of variable importance based on Brier score, and 
-AUC(t) under all scenarios considered here are provided in Table X 
-(to be completed). 
-
-# R documentation
-
-## Additive survival models
-
-**Flexible Regression Models for Survival Data:** 
-<https://cran.r-project.org/web/packages/timereg/refman/timereg.html>
-
-## Super Learner in survival analysis
-
-The super learner requires 3 components:  
-
-1. A library of estimators  
-2. A loss function  
-3. A model for combining the estimators in the library  
-
-These three components should be tailored to the specific problem. The library 
-should be built such that each estimator in the library could individually 
-estimate the parameter of interest. The loss function should be chosen to 
-reflect the goals of the problem. If one is interested in estimating the hazard, 
-the loss function should ideally involve the hazard; if interest in the survival 
-function, the loss function should involve the survival function. This may seem 
-common sense, but we often see researchers use a hazard loss function when the 
-interest is on the survival probability at a specific time point. The loss 
-function should be chosen with respect to the problem you are trying to solve. 
-The model for combining the estimators in the library is often chosen to 
-maintain a bounded loss function for the super learner.
-
-#### Super Learner for survival data by minimizing 
-**cross-validated negative partial log-likelihood**
-
-<https://github.com/kgolmakani/SuperLearner-Survival>
-
-Golmakani’s approach builds a Super Learner for survival data by minimizing 
-**cross-validated negative partial log-likelihood**. So, the base learners are 
-hazard-based learners optimized on Cox partial likelihood. This approach 
-optimizes the best convex combination for **hazard ranking**. 
-
-### Survival Super Learner 
-
-*Predicting survival by a Super Learner* (`survivalSL`) 
-
-| Name              | Description |
-|-------------------|-------------|
-| LIB_COXall        | Proportional hazards (PH) model with all covariates (#) |
-| LIB_COXaic        | PH model with covariate selection by AIC minimization (#) |
-| LIB_COXen         | PH model with B-spline for quantitative covariates and Elastic-Net penalization (#; hyperparameters: alpha, lambda) |
-| LIB_COXlasso      | PH model with B-spline for quantitative covariates and Lasso penalization (#; hyperparameter: lambda) |
-| LIB_COXridge      | PH model with B-spline for quantitative covariates and Ridge penalization (#; hyperparameter: lambda) |
-| LIB_AFTgamma      | Accelerated failure time (AFT) model with Gamma distribution |
-| LIB_AFTggamma     | AFT model with generalized Gamma distribution |
-| LIB_AFTllogis     | AFT model with log-logistic distribution |
-| LIB_AFTweibull    | AFT model with Weibull distribution |
-| LIB_PHexponential | Parametric PH model with Exponential distribution |
-| LIB_PHgompertz    | Parametric PH model with Gompertz distribution |
-| LIB_PHspline      | PH model with natural cubic spline baseline (hyperparameter: k) |
-| LIB_RSF           | Random survival forest (hyperparameters: nodesize, mtry, ntree) |
-| LIB_PLANN         | One-layer survival neural network (hyperparameters: n.nodes, decay, batch.size, epochs) |
-
-*Super Learning for conditional survival functions with right-censored data* (`survSuperLearner`)
+The approximate true values of variable importance based on $AUC(t)$ and, Brier score ($BS(t)$) under all scenarios considered here are provided in @tbl-true-vim-brier and @tbl-true-vim-auc, respectively. 
 
 ```{r}
-# devtools::install_github("tedwestling/survSuperLearner")
-library(survSuperLearner)
-survSuperLearner::survlistWrappers()
+#| label: "tbl-true-vim-auc"
+#| tbl-cap: "Approximate true values of variable importance based on cumulative/dynamic AUC"
+
+kable(data.frame(
+  scenario_id = c(rep(1, 4), rep(2, 6)),
+  vars = c("$\\psi_{X_1}$", 
+           "$\\psi_{X_2}$", 
+           "$\\psi_{X_3}$", 
+           "$\\psi_{X_4}$", 
+           "$\\psi_{X_1}$", 
+           "$\\psi_{X_2}$", 
+           "$\\psi_{X_3}$", 
+           "$\\psi_{Z_1}$",
+           "$\\psi_{Z_2}$",
+           "$\\psi_{Z_3}$" ), 
+  vim_survML = "",
+  vim_aalen  = "",
+  vim_cox_aalen = ""), 
+  col.names = c("Scenario ID",
+                "Variable", 
+                "Global survival stacking",
+                "Aalen model",
+                "Cox-Aalen model"),
+  escape = FALSE)
 ```
 
-| Wrapper            | Description |
-|--------------------|------------|
-| survSL.coxph       | Cox proportional hazards model |
-| survSL.expreg      | Parametric exponential survival regression |
-| survSL.gam         | Generalized additive survival model |
-| survSL.km          | Kaplan–Meier estimator |
-| survSL.loglogreg   | Log-logistic survival regression |
-| survSL.pchreg      | Piecewise constant hazards regression |
-| survSL.pchSL       | SuperLearner with piecewise constant hazards |
-| survSL.rfsrc       | Random survival forest (randomForestSRC) |
-| survSL.template    | Template for custom survival wrapper |
-| survSL.weibreg     | Weibull survival regression |
-
-| Wrapper              | Description |
-|----------------------|------------|
-| All                  | No screening (all variables retained) |
-| survscreen.glmnet    | Screening via glmnet penalized regression |
-| survscreen.marg      | Marginal screening (univariate survival association) |
-| survscreen.template  | Template for custom survival screening |
-
-
-### Global survival stacking 
 
 ```{r}
-library(survML)
-library(SuperLearner)
-SuperLearner::listWrappers()
-```
+#| label: "tbl-true-vim-brier"
+#| tbl-cap: "Approximate true values of variable importance based on Brier score"
 
-| Wrapper              | Type |
-|----------------------|------|
-| SL.bartMachine       | Bayesian Additive Regression Trees (BART) |
-| SL.bayesglm          | Bayesian generalized linear model |
-| SL.biglasso          | Lasso / Elastic-Net (biglasso) |
-| SL.caret             | caret unified interface |
-| SL.caret.rpart       | caret interface for rpart |
-| SL.cforest           | Conditional inference forest |
-| SL.earth             | Multivariate Adaptive Regression Splines (MARS) |
-| SL.gam               | Generalized additive model |
-| SL.gbm               | Gradient boosting machine |
-| SL.glm               | Generalized linear model |
-| SL.glm.interaction   | GLM with interaction terms |
-| SL.glmnet            | Elastic-Net regularized GLM |
-| SL.ipredbagg         | Bagged trees (ipred) |
-| SL.kernelKnn         | Kernel k-nearest neighbors |
-| SL.knn               | k-nearest neighbors |
-| SL.ksvm              | Kernel support vector machine |
-| SL.lda               | Linear discriminant analysis |
-| SL.leekasso          | Leekasso variable selection |
-| SL.lm                | Linear model |
-| SL.loess             | Local regression (LOESS) |
-| SL.logreg            | Logistic regression |
-| SL.mean              | Mean predictor |
-| SL.nnet              | Neural network |
-| SL.nnls              | Non-negative least squares |
-| SL.polymars          | Polynomial MARS |
-| SL.qda               | Quadratic discriminant analysis |
-| SL.randomForest      | Random forest |
-| SL.ranger            | Fast random forest (ranger) |
-| SL.ridge             | Ridge regression |
-| SL.rpart             | CART decision tree |
-| SL.rpartPrune        | Pruned CART tree |
-| SL.speedglm          | Fast GLM |
-| SL.speedlm           | Fast linear model |
-| SL.step              | Stepwise selection |
-| SL.step.forward      | Forward stepwise selection |
-| SL.step.interaction  | Stepwise with interactions |
-| SL.stepAIC           | Stepwise AIC selection |
-| SL.svm               | Support vector machine |
-| SL.template          | Template for custom wrapper |
-| SL.xgboost           | Extreme gradient boosting |
-
-| Wrapper               | Type |
-|-----------------------|------|
-| All                   | No screening (all variables retained) |
-| screen.corP           | Correlation screening (p-value based) |
-| screen.corRank        | Correlation rank screening |
-| screen.glmnet         | Screening via glmnet |
-| screen.randomForest   | Screening via random forest importance |
-| screen.SIS            | Sure Independence Screening |
-| screen.template       | Template for custom screening |
-| write.screen.template | Utility to create screening template |
-
-## Permutation variable importance
-
-<https://cran.r-project.org/web/packages/survex/refman/survex.html>
-
-## Random survival forests 
-
-**Random survival forests** 
-
-```{r}
-# library(randomForestSRC)
-```
-
-**Ensemble methods for survival function estimation with time-varying covariates** (`LTRCforests`) 
-
-```{r}
-# devtools::install_github("weichiyao/LTRCforests")
-# library(LTRCforests)
+kable(data.frame(
+  scenario_id = c(rep(1, 4), rep(2, 6)),
+  vars = c("$\\psi_{X_1}$", 
+           "$\\psi_{X_2}$", 
+           "$\\psi_{X_3}$", 
+           "$\\psi_{X_4}$", 
+           "$\\psi_{X_1}$", 
+           "$\\psi_{X_2}$", 
+           "$\\psi_{X_3}$", 
+           "$\\psi_{Z_1}$",
+           "$\\psi_{Z_2}$",
+           "$\\psi_{Z_3}$" ), 
+  vim_survML = "",
+  vim_aalen  = "",
+  vim_cox_aalen = ""), 
+  col.names = c("Scenario ID",
+                "Variable", 
+                "Global survival stacking",
+                "Aalen model",
+                "Cox-Aalen model"),
+  escape = FALSE)
 ```
 
 # References 

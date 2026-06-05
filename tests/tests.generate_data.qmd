@@ -41,7 +41,8 @@ options(scipen = 999)
 
 # Set seed for reproducibility 
 set.seed(2026)
-R <- 1000
+# R <- 1000
+R <- 10
 ```
 
 \newpage
@@ -74,7 +75,7 @@ Sigma <- matrix(c(1,   0,   0.2,
                   0.2, 0.5, 1), 
                 3, 3)
 
-dna1 <- data.frame(simulate_dna_pathways(n, prev, Sigma))
+dna1 <- data.frame(simulate_binary(n, prev, Sigma))
 head(dna1)
 
 # Check prevalences
@@ -107,7 +108,7 @@ $$\Sigma = \left(
 
 ```{r}
 Sigma0 <- diag(3)
-dna0 <- data.frame(simulate_dna_pathways(n, prev, Sigma0))
+dna0 <- data.frame(simulate_binary(n, prev, Sigma0))
 
 # Check prevalences
 colMeans(dna0)
@@ -165,7 +166,7 @@ Sigma %>%
     }
 
 # Simulate correlated data using this matrix 
-dna_block <- data.frame(simulate_dna_pathways(n, prev, Sigma))
+dna_block <- data.frame(simulate_binary(n, prev, Sigma))
 
 # Check marginal prevalences
 data.frame(true_prev = prev, 
@@ -238,7 +239,7 @@ Sigma %>%
 
 # Run simulations
 dna_sims <- replicate(R,
-                      simulate_dna_pathways(n, prev, Sigma),
+                      simulate_binary(n, prev, Sigma),
                       simplify = FALSE) %>%
   imap(~ mutate(data.frame(.x), R = .y)) %>%
   bind_rows()
@@ -353,7 +354,7 @@ Sigma %>%
              title = "True correlation matrix in the simulation design")
     }
 
-rna1 <- simulate_rna_pathways(n, p, mu, Sigma)
+rna1 <- simulate_continuous(n, p, mu, Sigma)
 
 # Check mean 
 colMeans(rna1)
@@ -423,7 +424,7 @@ Sigma %>%
     }
 
 # Simulate correlated data using this matrix 
-rna_block <- simulate_rna_pathways(n, p, mu, Sigma)
+rna_block <- simulate_continuous(n, p, mu, Sigma)
 
 # Check mean 
 colMeans(rna_block)
@@ -478,7 +479,7 @@ rownames(Sigma) <- paste0("X",1:20)
 
 # Run simulations 
 rna_sims <- replicate(R,
-                      simulate_rna_pathways(n, p, mu, Sigma),
+                      simulate_continuous(n, p, mu, Sigma),
                       simplify = FALSE)
 
 # Check mean 
@@ -567,13 +568,13 @@ Four binary covariates were generated *independently* with prevalence of 50%, $X
 Events times were simulated under the following time-constant additive hazards 
 model: 
 
-$$\lambda(t|x)=\lambda_0+\beta_{1}X_{1}+\beta_{2}X_{2}+\beta_{3}X_{3}+\beta_{4}X_{4}$$
-with $\lambda_0=0.05$ and $\beta=(0.06, 0.02, 0.005, 0)$. 
+$$\lambda(t|x)=\lambda_0+\alpha_{1}X_{1}+\alpha_{2}X_{2}+\alpha_{3}X_{3}+\alpha_{4}X_{4}$$
+with $\lambda_0=0.05$ and $\beta=(0.1, 0.05, 0.005, 0)$. 
 
 This means:
 
-* Having $X_1=1$ increases the hazard by $0.06$ compared with $X_1=0$
-* Having $X_2=1$ increases the hazard by $0.02$ compared with $X_2=0$
+* Having $X_1=1$ increases the hazard by $0.1$ compared with $X_1=0$
+* Having $X_2=1$ increases the hazard by $0.05$ compared with $X_2=0$
 * Having $X_3=1$ increases the hazard by $0.005$ compared with $X_3=0$
 * There are no difference in hazard between $X_4=1$ and $X_4=0$
 
@@ -592,21 +593,20 @@ simulation replicates.
 ```{r}
 # Generate data
 n <- 1000
-p <- 4
+alpha <- c(0.1, 0.05, 0.03, 0.01, 0.005, 0)
+p <- length(alpha)
+prev <- rep(0.4, p)
 sigma <- diag(x = 1, nrow = p, ncol = p)
-# prev <- c(0.005, 0.02, 0.05, 0.20)
-prev <- rep(0.4, 4)
-beta <- c(0.06, 0.02, 0.005, 0)
 lambda0 <- 0.05
 target_cens <- 0.05
 c_max <- calibrate_c_max_aalen(lambda0     = lambda0,
-                               beta        = beta,
+                               alpha       = alpha,
                                prev        = prev, 
                                sigma       = sigma,
                                target_cens = target_cens,
                                seed        = 2026)
 c_max
-data_aalen <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
+data_aalen <- simulate_aalen_data(n, prev, sigma, lambda0, alpha, c_max)
 head(data_aalen)
 
 # Check prevalences
@@ -619,13 +619,11 @@ mean(1 - data_aalen$event)
 **Kaplan-Meier**
 
 ```{r }
-km_aalen_fit <- survfit(Surv(time, event)~1, data_aalen)
-km_aalen_fit
-ggsurvplot(km_aalen_fit, data = data_aalen, legend = "none")
-ggsurvplot(survfit(Surv(time, event)~X1, data_aalen))
-ggsurvplot(survfit(Surv(time, event)~X2, data_aalen))
-ggsurvplot(survfit(Surv(time, event)~X3, data_aalen))
-ggsurvplot(survfit(Surv(time, event)~X4, data_aalen))
+list_form <- c("1",paste0("X",1:p))%>%
+  purrr::map(~as.formula(paste("Surv(time,event)~", .x)))
+plot_surv(formula = list_form, 
+          data = data_aalen, 
+          legend.title = c("", paste0("X",1:p)))
 ```
 
 **Aalen model**
@@ -635,15 +633,16 @@ ggsurvplot(survfit(Surv(time, event)~X4, data_aalen))
 aalen_fit <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data = data_aalen)
 summary(aalen_fit)
 ```
+
 ***Test for non-significant effects***
 
 The model estimates the cumulative effects
 
 $$
-B_j(t)=\int_{0}^{t}\beta_j(u)du.
+A_j(t)=\int_{0}^{t}\alpha_j(u)du.
 $$
 
-The reported *Supremum test* evaluates $H_0: B_j(t)=0$, meaning the covariate has no effect on the hazard over time. 
+The reported *Supremum test* evaluates $H_0: A_j(t)=0$, meaning the covariate has no effect on the hazard over time. 
 
 Interpretation of the results 
 
@@ -677,7 +676,7 @@ We simulated $R=1000$ datasets.
 ```{r}
 test_aalen <- replicate(R, {
   # Generate data 
-  data <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
+  data <- simulate_aalen_data(n, prev, sigma, lambda0, alpha, c_max)
   # Estimate prevalences 
   prev <- colMeans(data %>% dplyr::select(starts_with("X")))%>%
     stats::setNames(paste0("prev_", names(.)))
@@ -713,38 +712,43 @@ test_aalen %>%
 
 The covariates are generated *independently* as follows:
 
-$X = (X_{1}, X_{2}, X_{3}, X_{4})$ 
+$X = (X_{1}, X_{2}, X_{3}, Z_{1}, Z_{2}, Z_{3})$ 
 
 where
   
-* $X_{1} \sim \mathcal{B}(0.4)$
-* $X_{2} \sim \mathcal{B}(0.4)$
-* $X_{3} \sim \mathcal{B}(0.4)$
-* $X_{4} \sim \mathcal{N}(0,1)$
+* $X_{1}, X_{2}, X_{3} \sim \mathcal{B}(0.4)$
+* $Z_{1}, Z_{2} \sim \mathcal{B}(0.4)$
+* $Z_{3} \sim \mathcal{N}(0,1)$
 
 To generate mixed additive and multiplicative effects, event times were 
 simulated under a Cox-Aalen model with constant baseline hazard: 
-$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$ and $X_2$ with 
-coefficients $\beta_{1}=0.06$ and $\beta_{3}=0.005$, respectively. 
+$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$, $X_2$ and $X_3$ with 
+coefficients $\alpha_{1}=0.1$, $alpha_{2}=0.05$ and $\alpha_{3}=0$, respectively. 
 Multiplicative (proportional hazards) effects were assigned to 
-$X_3$ and $X_4$ with coefficients $\beta_{2}=0.5$ and
-$\beta_{4}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
+$Z_1$, $Z_2$ and $Z_3$ with coefficients $\beta_{1}=1$, $beta_{2}=0.5$ and
+$\beta_{3}=0$, corresponding to hazard ratios of approximately 2.72, 1.65 and 1. 
+
+Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
+parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
+data-generating mechanism to achieve an expected censoring proportion of 
+approximately 5%, and the calibrated value was then fixed across all 
+simulation replicates. 
 
 ```{r}
 n <- 1000
-prev_add <- c(0.4, 0.4)
-sigma_add <- diag(x = 1, nrow = 2, ncol = 2)
-beta_add <- c(0.06, 0.005)
-prev_mult <- 0.4
-sigma_mult_bin <- diag(x = 1, nrow = 1, ncol = 1)
+prev_add <- c(0.4, 0.4, 0.4)
+sigma_add <- diag(x = 1, nrow = 3, ncol = 3)
+alpha <- c(0.1, 0.05, 0)
+prev_mult <- c(0.4, 0.4)
+sigma_mult_bin <- diag(x = 1, nrow = 2, ncol = 2)
 mean_mult <- 0
 sigma_mult_cont <- diag(x = 1, nrow = 1, ncol = 1)
-beta_mult <- c(0.5, 0.2)
+beta <- c(1, 0.5, 0)
 lambda0 <- 0.05
 target_cens <- 0.05
 c_max <- calibrate_c_max_cox_aalen(lambda0         = lambda0,
-                                   beta_add        = beta_add,
-                                   beta_mult       = beta_mult,
+                                   alpha           = alpha,
+                                   beta            = beta,
                                    prev_add        = prev_add,
                                    sigma_add       = sigma_add,
                                    prev_mult       = prev_mult,
@@ -755,18 +759,18 @@ c_max <- calibrate_c_max_cox_aalen(lambda0         = lambda0,
                                    seed            = 2026)
 c_max
 data_cox_aalen <- simulate_cox_aalen_data(
-  n, lambda0, beta_add, beta_mult,
+  n, lambda0, alpha, beta,
   prev_add, sigma_add, prev_mult, mean_mult,
   sigma_mult_bin, sigma_mult_cont, c_max
-  )
+)
 head(data_cox_aalen)
 
 # Check prevalences
-colMeans(data_cox_aalen %>% dplyr::select(X1:X3))
+colMeans(data_cox_aalen %>% dplyr::select(X1:X3,Z1:Z2))
 
 # Check mean and sd 
-round(mean(data_cox_aalen$X4), 3)
-sd(data_cox_aalen$X4)
+round(mean(data_cox_aalen$Z3), 3)
+sd(data_cox_aalen$Z3)
 
 # Check censoring rate 
 mean(1 - data_cox_aalen$event)
@@ -775,22 +779,23 @@ mean(1 - data_cox_aalen$event)
 **Kaplan-Meier**
 
 ```{r }
-km_cox_aalen_fit <- survfit(Surv(time, event)~1, data_cox_aalen)
-km_cox_aalen_fit
-ggsurvplot(km_cox_aalen_fit, data = data_cox_aalen, legend = "none")
-ggsurvplot(survfit(Surv(time, event)~X1, data_cox_aalen))
-ggsurvplot(survfit(Surv(time, event)~X2, data_cox_aalen))
-ggsurvplot(survfit(Surv(time, event)~X3, data_cox_aalen))
+list_form <- c("1",paste0("X",1:3), paste0("Z",1:2))%>%
+  purrr::map(~as.formula(paste("Surv(time,event)~", .x)))
+plot_surv(formula = list_form, 
+          data = data_cox_aalen, 
+          legend.title = c("", paste0("X",1:3), paste0("Z",1:2)))
 ```
 
 **Cox-Aalen model**
 
 ```{r}
 # Fit Cox-Aalen model 
-cox_aalen_fit <- timereg::cox.aalen(Surv(time, event)~X1+X2+prop(X3)+prop(X4), 
-                                    data = data_cox_aalen, n.sim = 1000, basesim = 1)
+cox_aalen_fit <- timereg::cox.aalen(
+  Surv(time, event)~X1+X2+X3+prop(Z1)+prop(Z2)+prop(Z3), 
+  data = data_cox_aalen, n.sim = 1000, basesim = 1)
 summary(cox_aalen_fit)
 ```
+
 ***Test for non-significant effects***
 
 * Intercept: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeq0[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard is clearly non zero
@@ -831,14 +836,16 @@ test_cox_aalen <- replicate(R, {
   # Estimate prevalences 
   prev <- colMeans(data %>% dplyr::select(X1:X3))%>%
     stats::setNames(paste0("prev_", names(.)))
-  # Mean and sd X4 
-  mean_sd_X4 <- stats::setNames(c(mean(data$X4), sd(data$X4)),
-                                c("mean_X4","sd_X4"))
+  # Mean and sd Z3
+  mean_sd_Z3 <- stats::setNames(c(mean(data$Z3), sd(data$Z3)),
+                                c("mean_Z3","sd_Z3"))
   # Censoring rate 
   cens_rate <- stats::setNames(mean(1 - data$event), "cens_rate")
   # Fit Cox-Aalen model
-  fit_obj <- timereg::cox.aalen(Surv(time, event)~X1+X2+prop(X3)+prop(X4),
-                                data = data, n.sim = 1000, basesim = 1)
+  fit_obj <- timereg::cox.aalen(
+    Surv(time, event)~X1+X2+X3+prop(Z1)+prop(Z2)+prop(Z3),
+    data = data, n.sim = 1000, basesim = 1
+  )
   # Additive terms 
   pval_supremum <- fit_obj[["pval.testBeq0"]] 
   names(pval_supremum) <- paste0("pval_supremum_", names(pval_supremum)) 
@@ -854,7 +861,7 @@ test_cox_aalen <- replicate(R, {
     gsub("prop\\(|\\)","", paste0("pval_prop_", names(fit_obj$pval.Prop)))
     )
   
-  c(prev, mean_sd_X4, cens_rate, 
+  c(prev, mean_sd_Z3, cens_rate, 
     pval_supremum, pval_KS, #pval_CvM, 
     coef, pval_prop)
   

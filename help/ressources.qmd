@@ -1,0 +1,172 @@
+---
+title: "Ressources"
+format: pdf
+---
+
+# R documentation
+
+## Additive survival models
+
+**Flexible Regression Models for Survival Data:** 
+<https://cran.r-project.org/web/packages/timereg/refman/timereg.html>
+
+## Super Learner in survival analysis
+
+The super learner requires 3 components:  
+
+1. A library of estimators  
+2. A loss function  
+3. A model for combining the estimators in the library  
+
+These three components should be tailored to the specific problem. The library 
+should be built such that each estimator in the library could individually 
+estimate the parameter of interest. The loss function should be chosen to 
+reflect the goals of the problem. If one is interested in estimating the hazard, 
+the loss function should ideally involve the hazard; if interest in the survival 
+function, the loss function should involve the survival function. This may seem 
+common sense, but we often see researchers use a hazard loss function when the 
+interest is on the survival probability at a specific time point. The loss 
+function should be chosen with respect to the problem you are trying to solve. 
+The model for combining the estimators in the library is often chosen to 
+maintain a bounded loss function for the super learner.
+
+#### Super Learner for survival data by minimizing 
+**cross-validated negative partial log-likelihood**
+
+<https://github.com/kgolmakani/SuperLearner-Survival>
+
+Golmakani’s approach builds a Super Learner for survival data by minimizing 
+**cross-validated negative partial log-likelihood**. So, the base learners are 
+hazard-based learners optimized on Cox partial likelihood. This approach 
+optimizes the best convex combination for **hazard ranking**. 
+
+### Survival Super Learner 
+
+*Predicting survival by a Super Learner* (`survivalSL`) 
+
+| Name              | Description |
+|-------------------|-------------|
+| LIB_COXall        | Proportional hazards (PH) model with all covariates (#) |
+| LIB_COXaic        | PH model with covariate selection by AIC minimization (#) |
+| LIB_COXen         | PH model with B-spline for quantitative covariates and Elastic-Net penalization (#; hyperparameters: alpha, lambda) |
+| LIB_COXlasso      | PH model with B-spline for quantitative covariates and Lasso penalization (#; hyperparameter: lambda) |
+| LIB_COXridge      | PH model with B-spline for quantitative covariates and Ridge penalization (#; hyperparameter: lambda) |
+| LIB_AFTgamma      | Accelerated failure time (AFT) model with Gamma distribution |
+| LIB_AFTggamma     | AFT model with generalized Gamma distribution |
+| LIB_AFTllogis     | AFT model with log-logistic distribution |
+| LIB_AFTweibull    | AFT model with Weibull distribution |
+| LIB_PHexponential | Parametric PH model with Exponential distribution |
+| LIB_PHgompertz    | Parametric PH model with Gompertz distribution |
+| LIB_PHspline      | PH model with natural cubic spline baseline (hyperparameter: k) |
+| LIB_RSF           | Random survival forest (hyperparameters: nodesize, mtry, ntree) |
+| LIB_PLANN         | One-layer survival neural network (hyperparameters: n.nodes, decay, batch.size, epochs) |
+
+*Super Learning for conditional survival functions with right-censored data* (`survSuperLearner`)
+
+```{r}
+# devtools::install_github("tedwestling/survSuperLearner")
+library(survSuperLearner)
+survSuperLearner::survlistWrappers()
+```
+
+| Wrapper            | Description |
+|--------------------|------------|
+| survSL.coxph       | Cox proportional hazards model |
+| survSL.expreg      | Parametric exponential survival regression |
+| survSL.gam         | Generalized additive survival model |
+| survSL.km          | Kaplan–Meier estimator |
+| survSL.loglogreg   | Log-logistic survival regression |
+| survSL.pchreg      | Piecewise constant hazards regression |
+| survSL.pchSL       | SuperLearner with piecewise constant hazards |
+| survSL.rfsrc       | Random survival forest (randomForestSRC) |
+| survSL.template    | Template for custom survival wrapper |
+| survSL.weibreg     | Weibull survival regression |
+
+| Wrapper              | Description |
+|----------------------|------------|
+| All                  | No screening (all variables retained) |
+| survscreen.glmnet    | Screening via glmnet penalized regression |
+| survscreen.marg      | Marginal screening (univariate survival association) |
+| survscreen.template  | Template for custom survival screening |
+
+
+### Global survival stacking 
+
+```{r}
+library(survML)
+library(SuperLearner)
+SuperLearner::listWrappers()
+```
+
+| Wrapper              | Type |
+|----------------------|------|
+| SL.bartMachine       | Bayesian Additive Regression Trees (BART) |
+| SL.bayesglm          | Bayesian generalized linear model |
+| SL.biglasso          | Lasso / Elastic-Net (biglasso) |
+| SL.caret             | caret unified interface |
+| SL.caret.rpart       | caret interface for rpart |
+| SL.cforest           | Conditional inference forest |
+| SL.earth             | Multivariate Adaptive Regression Splines (MARS) |
+| SL.gam               | Generalized additive model |
+| SL.gbm               | Gradient boosting machine |
+| SL.glm               | Generalized linear model |
+| SL.glm.interaction   | GLM with interaction terms |
+| SL.glmnet            | Elastic-Net regularized GLM |
+| SL.ipredbagg         | Bagged trees (ipred) |
+| SL.kernelKnn         | Kernel k-nearest neighbors |
+| SL.knn               | k-nearest neighbors |
+| SL.ksvm              | Kernel support vector machine |
+| SL.lda               | Linear discriminant analysis |
+| SL.leekasso          | Leekasso variable selection |
+| SL.lm                | Linear model |
+| SL.loess             | Local regression (LOESS) |
+| SL.logreg            | Logistic regression |
+| SL.mean              | Mean predictor |
+| SL.nnet              | Neural network |
+| SL.nnls              | Non-negative least squares |
+| SL.polymars          | Polynomial MARS |
+| SL.qda               | Quadratic discriminant analysis |
+| SL.randomForest      | Random forest |
+| SL.ranger            | Fast random forest (ranger) |
+| SL.ridge             | Ridge regression |
+| SL.rpart             | CART decision tree |
+| SL.rpartPrune        | Pruned CART tree |
+| SL.speedglm          | Fast GLM |
+| SL.speedlm           | Fast linear model |
+| SL.step              | Stepwise selection |
+| SL.step.forward      | Forward stepwise selection |
+| SL.step.interaction  | Stepwise with interactions |
+| SL.stepAIC           | Stepwise AIC selection |
+| SL.svm               | Support vector machine |
+| SL.template          | Template for custom wrapper |
+| SL.xgboost           | Extreme gradient boosting |
+
+| Wrapper               | Type |
+|-----------------------|------|
+| All                   | No screening (all variables retained) |
+| screen.corP           | Correlation screening (p-value based) |
+| screen.corRank        | Correlation rank screening |
+| screen.glmnet         | Screening via glmnet |
+| screen.randomForest   | Screening via random forest importance |
+| screen.SIS            | Sure Independence Screening |
+| screen.template       | Template for custom screening |
+| write.screen.template | Utility to create screening template |
+
+## Permutation variable importance
+
+<https://cran.r-project.org/web/packages/survex/refman/survex.html>
+
+## Random survival forests 
+
+**Random survival forests** 
+
+```{r}
+# library(randomForestSRC)
+```
+
+**Ensemble methods for survival function estimation with time-varying covariates** (`LTRCforests`) 
+
+```{r}
+# devtools::install_github("weichiyao/LTRCforests")
+# library(LTRCforests)
+```

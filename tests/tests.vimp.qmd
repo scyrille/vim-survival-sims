@@ -59,15 +59,14 @@ This scenario:
 ## Data generating mechanism 
 
 Four binary covariates were generated *independently* with prevalences spanning 
-rare to frequent alterations, $X_j \sim Bernoulli(\pi_j)$ with 
-$\pi_j =(0.005, 0.02, 0.05, 0.20)$. 
+rare to frequent alterations, $X_j \sim Bernoulli(0.4)$. 
 
-Events times were simulated under the following time-constant additive hazards 
+Events times were simulated under the following the additive hazards 
 model: 
 
 $$\lambda(t|x)=\lambda_0(t)+\beta_{1}(t)X_{1}+\beta_{2}(t)X_{2}+\beta_{3}(t)X_{3}+\beta_{4}(t)X_{4}$$
 
-with $\lambda_0(t)=0.05$ (constant) and $\beta_j(t)=(0.06, 0.02, 0.005, 0)$. 
+with $\lambda_0(t)=0.05$ (constant) and $\beta_j(t)=(0.1, 0.05, 0.005, 0)$. 
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
@@ -119,8 +118,8 @@ required for VIM computation:
 We define time horizons, maximum follow-up time and times at which to approximate integrals.
 
 ```{r}
-surv_fit <- survival::survfit(survival::Surv(time, event)~1)
-landmark_times <- quantile(surv_fit, 
+surv_aalen_fit <- survival::survfit(survival::Surv(time, event)~1)
+landmark_times <- quantile(surv_aalen_fit, 
                            probs = c(#0.25, 
                                      0.75))$quantile
 landmark_times
@@ -333,17 +332,21 @@ This scenario:
 
 The covariates are generated *independently* as follows:
 
-* $X = (X_{1}, X_{2}, X_{3}, X_{4})$
-* $X_{1}, X_{2} \sim \mathcal{B}(0.4)$
-* $X_{3}, X_{4} \sim \mathcal{N}(0,1)$
+$X = (X_{1}, X_{2}, X_{3}, Z_{1}, Z_{2}, Z_{3})$ 
+
+where
+  
+* $X_{1}, X_{2}, X_{3} \sim \mathcal{B}(0.4)$
+* $Z_{1}, Z_{2} \sim \mathcal{B}(0.4)$
+* $Z_{3} \sim \mathcal{N}(0,1)$
 
 To generate mixed additive and multiplicative effects, event times were 
 simulated under a Cox-Aalen model with constant baseline hazard: 
-$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$ and $X_3$ with 
-coefficients $\beta_{1}(t)=0.06$ and $\beta_{3}(t)=0.005$, respectively. 
+$\lambda_0(t)=0.05$. Additive effects were assigned to $X_1$, $X_2$ and $X_3$ with 
+coefficients $\alpha_{1}=0.1$, $alpha_{2}=0.05$ and $\alpha_{3}=0$, respectively. 
 Multiplicative (proportional hazards) effects were assigned to 
-$X_2$ and $X_4$ with coefficients $\beta_{2}=0.5$ and
-$\beta_{4}=0.2$, corresponding to hazard ratios of approximately 1.65 and 1.22. 
+$Z_1$, $Z_2$ and $Z_3$ with coefficients $\beta_{1}=1$, $beta_{2}=0.5$ and
+$\beta_{3}=0$, corresponding to hazard ratios of approximately 2.72, 1.65 and 1. 
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
@@ -352,14 +355,14 @@ approximately 20%, and the calibrated value was then fixed across all
 simulation replicates. 
 
 ```{r}
-prev_add <- c(0.4, 0.4)
-sigma_add <- diag(x = 1, nrow = 2, ncol = 2)
-beta_add <- c(0.06, 0.005)
-prev_mult <- 0.4
-sigma_mult_bin <- diag(x = 1, nrow = 1, ncol = 1)
+prev_add <- c(0.4, 0.4, 0.4)
+sigma_add <- diag(x = 1, nrow = 3, ncol = 3)
+beta_add <- c(0.1, 0.05, 0)
+prev_mult <- c(0.4, 0.4)
+sigma_mult_bin <- diag(x = 1, nrow = 2, ncol = 2)
 mean_mult <- 0
 sigma_mult_cont <- diag(x = 1, nrow = 1, ncol = 1)
-beta_mult <- c(0.5, 0.2)
+beta_mult <- c(1, 0.5, 0)
 lambda0 <- 0.05
 target_cens <- 0.2
 c_max <- calibrate_c_max_cox_aalen(lambda0         = lambda0,
@@ -382,22 +385,24 @@ data_scen2 <- simulate_cox_aalen_data(
 head(data_scen2)
 
 # Check prevalences
-colMeans(data_scen2 %>% dplyr::select(X1:X3))
+colMeans(data_scen2 %>% dplyr::select(X1:X3,Z1:Z2))
 
 # Check mean and sd 
-round(mean(data_scen2$X4), 3)
-sd(data_scen2$X4)
+round(mean(data_scen2$Z3), 3)
+sd(data_scen2$Z3)
 
 # Check censoring rate 
 mean(1 - data_scen2$event)
 
-cox_aalen_fit <- timereg::cox.aalen(Surv(time, event)~X1+X2+prop(X3)+prop(X4), 
-                                    data = data_scen2, n.sim = 1000, basesim = 1)
+cox_aalen_fit <- timereg::cox.aalen(
+  Surv(time, event)~X1+X2+X3+prop(Z1)+prop(Z2)+prop(Z3), 
+  data = data_scen2, n.sim = 1000, basesim = 1
+)
 summary(cox_aalen_fit)
 
 time <- data_scen2$time
 event <- data_scen2$event
-X <- data_scen2 %>% dplyr::select(starts_with("X"))
+X <- data_scen2 %>% dplyr::select(starts_with(c("X","Z")))
 ```
 
 ## Variable importance
@@ -412,7 +417,10 @@ required for VIM computation:
 We define time horizons, maximum follow-up time and times at which to approximate integrals.
 
 ```{r}
-landmark_times <- quantile(time, c(0.25, 0.75))
+surv_cox_aalen_fit <- survival::survfit(survival::Surv(time, event)~1)
+landmark_times <- quantile(surv_cox_aalen_fit, 
+                           probs = c(#0.25, 
+                                     0.75))$quantile
 approx_times <- sort(unique(c(0, time[event == 1], landmark_times)))
 approx_times <- approx_times[approx_times <= max(landmark_times)]
 length(approx_times)
@@ -525,7 +533,6 @@ kable(vim_stackG_scen2 %>%
 V0_cox_aalen_preds_scen2 <- CV_generate_full_predictions_landmark(
   time = time,
   event = event,
-  prop_vars = c("X3","X4"), 
   X = X,
   landmark_times = landmark_times,
   approx_times = approx_times,
@@ -612,18 +619,20 @@ kable(vim_cox_aalen_scen2 %>%
       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
-# Scenario 3: Rare genomic alterations with mixed effects under proportional
-hazards
 
-## Objectives 
+# Additional numerical experiments 
 
-This scenario aims to evaluate the overall performance of the VIM procedure to ***rare alterations*** exhibiting ***heterogeneous effect sizes (ranging from weak to strong)*** under a ***proportional hazards model***. More specifically, the objective is to assess whether the VIM approach can:
+## Sensitivity to low prevalence 
+
+### Objectives
+
+This scenario aims to evaluate the overall performance of the VIM procedure to ***rare alterations*** exhibiting ***heterogeneous effect sizes (ranging from weak to strong)*** under an additive ***Aalen model*** and a mixed additive and multiplicative ***Cox-Aaalen model***. More specifically, the objective is to assess whether the VIM approach can:
 
 * detect rare yet highly prognostic alterations,
 * discriminate between weak and strong prognostic signals, and
 * correctly identify non-informative (null) variables.
 
-## Data generating mechanism
+### Data generating mechanism
 
 All covariates were generated independently as binary variables: 
 
@@ -708,7 +717,7 @@ event <- data_scen3$event
 X <- data_scen3 %>% dplyr::select(starts_with("X"))
 ```
 
-## Variable importance 
+### Variable importance 
 
 We define time horizons, maximum follow-up time and times at which to approximate integrals.
 
@@ -817,8 +826,6 @@ kable(vim_stackG_scen3 %>%
         dplyr::relocate(indx, landmark_time),
       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
-
-# Additional numerical experiments 
 
 ## Sensitivity to covariate correlations 
 

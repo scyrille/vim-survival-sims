@@ -1,7 +1,6 @@
 
 generate_full_predictions <- function(time,
                                       event,
-                                      prop_vars = NULL, 
                                       X,
                                       X_holdout, 
                                       landmark_times,
@@ -54,8 +53,8 @@ generate_full_predictions <- function(time,
   else if (nuisance == "cox.aalen"){
     
     x_vars <- colnames(X)
-    prop_vars <- intersect(x_vars, prop_vars)
-    add_vars  <- setdiff(x_vars, prop_vars)
+    prop_vars <- x_vars[grepl("Z",x_vars)]
+    add_vars  <- x_vars[grepl("X",x_vars)]
     
     rhs <- c(
       if (length(prop_vars) > 0) paste0("prop(", prop_vars, ")"),
@@ -125,7 +124,6 @@ generate_reduced_predictions <- function(f_hat,
 
 CV_generate_full_predictions_landmark <- function(time,
                                                   event,
-                                                  prop_vars = NULL, 
                                                   X,
                                                   landmark_times,
                                                   approx_times,
@@ -142,7 +140,6 @@ CV_generate_full_predictions_landmark <- function(time,
     full_preds <- generate_full_predictions(
       time = time[train_id],
       event = event[train_id],
-      prop_vars = prop_vars, 
       X = X[train_id, , drop = FALSE],
       X_holdout = X[test_id, , drop = FALSE],
       

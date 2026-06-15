@@ -5,7 +5,8 @@ render:
 execute: 
   echo: false
 warning: false
-# bibliography: ../../references.bib
+bibliography: references.bib
+csl: apa.csl
 crossref: 
   tbl-title: "Table"
   fig-title: "Figure"

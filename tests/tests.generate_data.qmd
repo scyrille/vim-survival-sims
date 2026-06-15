@@ -16,7 +16,7 @@ execute:
   # echo: false
   message: false
   warning: false
-fig-width: 4
+fig-width: 5.5
 fig-align: "center"
 fig-cap-location: top
 html-math-method: mathml
@@ -41,8 +41,7 @@ options(scipen = 999)
 
 # Set seed for reproducibility 
 set.seed(2026)
-# R <- 1000
-R <- 10
+R <- 1000
 ```
 
 \newpage
@@ -828,11 +827,9 @@ We simulated $R=1000$ datasets.
 ```{r}
 test_cox_aalen <- replicate(R, {
   # Generate data 
-  data <- simulate_cox_aalen_data(n, lambda0, beta_add, beta_mult,
-                                  prev_add, sigma_add,
-                                  prev_mult, mean_mult,
-                                  sigma_mult_bin, sigma_mult_cont,
-                                  c_max)
+  data <- simulate_cox_aalen_data(n, lambda0, alpha, beta,
+                                  prev_add, sigma_add, prev_mult, mean_mult,
+                                  sigma_mult_bin, sigma_mult_cont, c_max)
   # Estimate prevalences 
   prev <- colMeans(data %>% dplyr::select(X1:X3))%>%
     stats::setNames(paste0("prev_", names(.)))

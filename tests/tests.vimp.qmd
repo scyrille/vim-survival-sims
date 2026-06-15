@@ -45,6 +45,8 @@ n <- 500
 V <- 5
 sample_split <- TRUE
 vims <- c("AUC","brier")
+R <- 10
+# R <- 1000
 ```
 
 # Scenario 1: Additive hazards 
@@ -56,7 +58,7 @@ This scenario:
 * evaluates the overall performance of the VIM procedure under additive hazards: bias, confidence interval coverage, confidence interval width, rejection probability 
 * assesses the robustness of the VIM procedure to nuisance-model choice required for VIM computation: Aalen model (`timereg::aalen`), survival Super Learner  (`survivalSL::survivalSL`), global survival stacking (`survML::stackG`)
 
-## Data generating mechanism 
+## Data generation 
 
 Four binary covariates were generated *independently* with prevalences spanning 
 rare to frequent alterations, $X_j \sim Bernoulli(0.4)$. 
@@ -64,9 +66,9 @@ rare to frequent alterations, $X_j \sim Bernoulli(0.4)$.
 Events times were simulated under the following the additive hazards 
 model: 
 
-$$\lambda(t|x)=\lambda_0(t)+\beta_{1}(t)X_{1}+\beta_{2}(t)X_{2}+\beta_{3}(t)X_{3}+\beta_{4}(t)X_{4}$$
+$$\lambda(t|x)=\lambda_0(t)+\alpha_{1}(t)X_{1}+\alpha_{2}(t)X_{2}+\alpha_{3}(t)X_{3}+\alpha_{4}(t)X_{4}$$
 
-with $\lambda_0(t)=0.05$ (constant) and $\beta_j(t)=(0.1, 0.05, 0.005, 0)$. 
+with $\lambda_0(t)=0.05$ (constant) and $\alpha_j(t)=(0.1, 0.05, 0.005, 0)$. 
 
 Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The
 parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
@@ -77,19 +79,23 @@ simulation replicates.
 ```{r}
 p <- 4
 sigma <- diag(x = 1, nrow = p, ncol = p)
-# prev <- c(0.005, 0.02, 0.05, 0.20)
-prev <- runif(p, 0.2, 0.4)
-beta <- c(0.06, 0.02, 0.005, 0)
+prev <- rep(0.4, p)
+alpha <- c(0.1, 0.05, 0.005, 0)
 lambda0 <- 0.05
 target_cens <- 0.2
 c_max <- calibrate_c_max_aalen(lambda0     = lambda0,
-                               beta        = beta,
+                               alpha       = alpha,
                                prev        = prev, 
                                sigma       = sigma,
                                target_cens = target_cens,
                                seed        = 2026)
 c_max
-data_scen1 <- simulate_aalen_data(n, prev, sigma, lambda0, beta, c_max)
+data_scen1 <- simulate_aalen_data(n       = n , 
+                                  prev    = prev, 
+                                  sigma   = sigma, 
+                                  lambda0 = lambda0, 
+                                  alpha   = alpha, 
+                                  c_max   = c_max) 
 head(data_scen1)
 
 # Check prevalences
@@ -100,10 +106,98 @@ mean(1 - data_scen1$event)
 
 aalen_fit <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data = data_scen1)
 summary(aalen_fit)
+```
 
-time <- data_scen1$time
-event <- data_scen1$event
-X <- data_scen1 %>% dplyr::select(starts_with("X")) 
+**Kaplan-Meier**
+
+```{r }
+list_form <- c("1",paste0("X",1:p))%>%
+  purrr::map(~as.formula(paste("Surv(time,event)~", .x)))
+plot_surv(formula = list_form, 
+          data = data_scen1, 
+          legend.title = c("", paste0("X",1:p)))
+```
+
+**Aalen model**
+
+```{r}
+# Fit the model
+aalen_fit <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data = data_scen1)
+summary(aalen_fit)
+```
+
+***Test for non-significant effects***
+
+The model estimates the cumulative effects
+
+$$
+A_j(t)=\int_{0}^{t}\alpha_j(u)du.
+$$
+
+The reported *Supremum test* evaluates $H_0: A_j(t)=0$, meaning the covariate has no effect on the hazard over time. 
+
+Interpretation of the results 
+
+* Intercept: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard is clearly non zero
+* $X_1$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_1$ affects the hazard 
+* $X_2$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[3], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_2$ affects the hazard 
+* $X_3$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[4], prepend_p = TRUE)` $\rightarrow$ No evidence that $X_3$ affects the hazard 
+* $X_4$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeq0[5], prepend_p = TRUE)` $\rightarrow$ No evidence that $X_4$ affects the hazard 
+
+***Test for time invariant effects***
+
+Interpretation of the results of the Kolmogorov–Smirnov test
+
+Small p-values $rigtharrow$ evidence of time-varying effects. 
+
+* Intercept: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard clearly varies over time
+* $X_1$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that effect of $X_1$ changes over time
+* $X_2$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[3], prepend_p = TRUE)` $\rightarrow$ Strong evidence that effect of $X_2$ changes over time
+* $X_3$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[4], prepend_p = TRUE)` $\rightarrow$ No strong evidence against constant effect
+* $X_4$: `r gtsummary::style_pvalue(aalen_fit$pval.testBeqC[5], prepend_p = TRUE)` $\rightarrow$ No evidence of time variation
+
+```{r }
+# Plot the non-parametric cumulative regression coefficients with 95% CI
+plot(aalen_fit, ylim = c(-0.5,4))
+```
+
+---
+
+We simulated $R=1000$ datasets. 
+
+```{r}
+test_aalen <- replicate(R, {
+  # Generate data 
+  data <- simulate_aalen_data(n, prev, sigma, lambda0, alpha, c_max)
+  # Estimate prevalences 
+  prev <- colMeans(data %>% dplyr::select(starts_with("X")))%>%
+    stats::setNames(paste0("prev_", names(.)))
+  # Censoring rate 
+  cens_rate <- stats::setNames(mean(1 - data$event), "cens_rate")
+  # Fit Aalen model
+  fit_obj <- timereg::aalen(Surv(time, event)~X1+X2+X3+X4, data)
+  # Tests
+  pval_supremum <- fit_obj[["pval.testBeq0"]] 
+  names(pval_supremum) <- paste0("pval_supremum_", names(pval_supremum)) 
+  pval_KS <- fit_obj[["pval.testBeqC"]] 
+  names(pval_KS) <- paste0("pval_KS_", names(pval_KS)) 
+  pval_CvM <- fit_obj[["pval.testBeqC.is"]] 
+  names(pval_CvM) <- paste0("pval_CvM_", names(pval_CvM))
+
+  c(prev, cens_rate, pval_supremum, pval_KS, pval_CvM)
+  }, simplify = F)%>%
+  bind_rows
+
+data.frame(colMeans(test_aalen))%>%
+  tibble::rownames_to_column()%>%
+  kable(col.names = c("Name","Value"))
+
+test_aalen %>%
+  dplyr::select(starts_with("pval"))%>%
+  dplyr::mutate(across(everything(), ~ifelse(.x<0.05, 1, 0)))%>%
+  dplyr::summarise_all(mean)%>%
+  tidyr::pivot_longer(everything())%>%
+  kable(col.names = c("p-value","Rejection probability"))
 ```
 
 ## Variable importance 
@@ -118,6 +212,9 @@ required for VIM computation:
 We define time horizons, maximum follow-up time and times at which to approximate integrals.
 
 ```{r}
+time <- data_scen1$time
+event <- data_scen1$event
+X <- data_scen1 %>% dplyr::select(starts_with("X")) 
 surv_aalen_fit <- survival::survfit(survival::Surv(time, event)~1)
 landmark_times <- quantile(surv_aalen_fit, 
                            probs = c(#0.25, 
@@ -127,6 +224,7 @@ approx_times <- sort(unique(c(0, time[event == 1], landmark_times)))
 approx_times <- approx_times[approx_times <= max(landmark_times)]
 length(approx_times)
 ```
+
 We generated cross-fitting and sample-splitting folds.
 
 ```{r}
@@ -319,6 +417,97 @@ kable(vim_aalen_scen1 %>%
       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
+### Survival Super Learner 
+
+```{r eval=FALSE}
+V0_survivalSL_preds_scen1 <- CV_generate_full_predictions_landmark(
+  time = time,
+  event = event,
+  X = X,
+  landmark_times = landmark_times,
+  approx_times = approx_times,
+  nuisance = "survivalSL",
+  cf_folds = cf_folds)
+# str(V0_stackG_preds_scen1)
+
+CV_full_preds <- V0_survivalSL_preds_scen1$CV_full_preds
+CV_full_preds_train <- V0_survivalSL_preds_scen1$CV_full_preds_train
+CV_S_preds <- V0_survivalSL_preds_scen1$CV_S_preds
+CV_G_preds <- V0_survivalSL_preds_scen1$CV_G_preds
+
+indxs <- 1:ncol(X)
+vim_survivalSL_scen1 <- purrr::map_dfr(indxs, function(indx_i) {
+  
+  char_indx <- as.character(indx_i)
+  indx <- as.numeric(strsplit(char_indx, split = ",")[[1]])
+  
+  CV_reduced_preds <- CV_generate_reduced_predictions_landmark(
+    time = time,
+    event = event,
+    X = X,
+    landmark_times = landmark_times,
+    cf_folds = cf_folds,
+    indx = indx,
+    full_preds_train = CV_full_preds_train
+  )
+  
+  purrr::map_dfr(vims, function(vim) {
+    
+    output <- switch(
+      vim,
+      brier = survML::vim_brier(
+        time = time,
+        event = event,
+        approx_times = approx_times,
+        landmark_times = landmark_times,
+        f_hat = CV_full_preds,
+        fs_hat = CV_reduced_preds,
+        S_hat = CV_S_preds,
+        G_hat = CV_G_preds,
+        cf_folds = cf_folds,
+        sample_split = sample_split, 
+        ss_folds = ss_folds
+      ),
+      AUC = survML::vim_AUC(
+        time = time,
+        event = event,
+        approx_times = approx_times,
+        landmark_times = landmark_times,
+        f_hat = purrr::map(CV_full_preds, ~ 1 - .x),
+        fs_hat = purrr::map(CV_reduced_preds, ~ 1 - .x),
+        S_hat = CV_S_preds,
+        G_hat = CV_G_preds,
+        cf_folds = cf_folds,
+        sample_split = sample_split, 
+        ss_folds = ss_folds
+      )
+    )
+    
+    output %>% 
+      dplyr::mutate(
+        vim = vim,
+        indx = char_indx
+      )
+  })
+})
+
+kable(vim_survivalSL_scen1 %>% 
+        dplyr::filter(vim == "AUC")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC"))
+
+kable(vim_survivalSL_scen1 %>% 
+        dplyr::filter(vim == "brier")%>%
+        tibble::remove_rownames()%>%
+        mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
+        dplyr::select(-c(cil_1sided, vim))%>%
+        dplyr::relocate(indx, landmark_time),
+      col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
+```
+
 # Scenario 2: Mixed additive and multiplicative hazards
 
 ## Objectives 
@@ -328,13 +517,9 @@ This scenario:
 * evaluates the overall performance of the VIM procedure under mixed additive and multiplicative hazards: bias, confidence interval coverage, confidence interval width, rejection probability 
 * assesses the robustness of the VIM procedure to nuisance-model choice required for VIM computation: Cox-Aalen model (`timereg::cox.aalen`), survival Super Learner (`survivalSL::survivalSL`), global survival stacking  (`survML::stackG`)
 
-## Data-generating mechanism
+## Data generation
 
 The covariates are generated *independently* as follows:
-
-$X = (X_{1}, X_{2}, X_{3}, Z_{1}, Z_{2}, Z_{3})$ 
-
-where
   
 * $X_{1}, X_{2}, X_{3} \sim \mathcal{B}(0.4)$
 * $Z_{1}, Z_{2} \sim \mathcal{B}(0.4)$
@@ -357,17 +542,17 @@ simulation replicates.
 ```{r}
 prev_add <- c(0.4, 0.4, 0.4)
 sigma_add <- diag(x = 1, nrow = 3, ncol = 3)
-beta_add <- c(0.1, 0.05, 0)
+alpha <- c(0.1, 0.05, 0)
 prev_mult <- c(0.4, 0.4)
 sigma_mult_bin <- diag(x = 1, nrow = 2, ncol = 2)
 mean_mult <- 0
 sigma_mult_cont <- diag(x = 1, nrow = 1, ncol = 1)
-beta_mult <- c(1, 0.5, 0)
+beta <- c(1, 0.5, 0)
 lambda0 <- 0.05
-target_cens <- 0.2
+target_cens <- 0.05
 c_max <- calibrate_c_max_cox_aalen(lambda0         = lambda0,
-                                   beta_add        = beta_add,
-                                   beta_mult       = beta_mult,
+                                   alpha           = alpha,
+                                   beta            = beta,
                                    prev_add        = prev_add,
                                    sigma_add       = sigma_add,
                                    prev_mult       = prev_mult,
@@ -378,10 +563,10 @@ c_max <- calibrate_c_max_cox_aalen(lambda0         = lambda0,
                                    seed            = 2026)
 c_max
 data_scen2 <- simulate_cox_aalen_data(
-  n, lambda0, beta_add, beta_mult,
+  n, lambda0, alpha, beta,
   prev_add, sigma_add, prev_mult, mean_mult,
   sigma_mult_bin, sigma_mult_cont, c_max
-  )
+)
 head(data_scen2)
 
 # Check prevalences
@@ -399,10 +584,108 @@ cox_aalen_fit <- timereg::cox.aalen(
   data = data_scen2, n.sim = 1000, basesim = 1
 )
 summary(cox_aalen_fit)
+```
+**Kaplan-Meier**
 
-time <- data_scen2$time
-event <- data_scen2$event
-X <- data_scen2 %>% dplyr::select(starts_with(c("X","Z")))
+```{r }
+list_form <- c("1",paste0("X",1:3), paste0("Z",1:2))%>%
+  purrr::map(~as.formula(paste("Surv(time,event)~", .x)))
+plot_surv(formula = list_form, 
+          data = data_scen2, 
+          legend.title = c("", paste0("X",1:3), paste0("Z",1:2)))
+```
+
+**Cox-Aalen model**
+
+```{r}
+# Fit Cox-Aalen model 
+cox_aalen_fit <- timereg::cox.aalen(
+  Surv(time, event)~X1+X2+X3+prop(Z1)+prop(Z2)+prop(Z3), 
+  data = data_scen2, n.sim = 1000, basesim = 1)
+summary(cox_aalen_fit)
+```
+
+***Test for non-significant effects***
+
+* Intercept: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeq0[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard is clearly non zero
+* $X_1$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeq0[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_1$ affects the hazard 
+* $X_2$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeq0[3], prepend_p = TRUE)` $\rightarrow$ No evidence that $X_2$ affects the hazard 
+
+***Test for time invariant effects***
+
+* Intercept: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeqC[1], prepend_p = TRUE)` $\rightarrow$ Baseline hazard clearly varies over time
+* $X_1$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeqC[2], prepend_p = TRUE)` $\rightarrow$ Strong evidence that $X_1$ affects the hazard 
+* $X_2$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.testBeqC[3], prepend_p = TRUE)` $\rightarrow$ No evidence of time variation
+
+***Test of proportionality***
+
+* $X_3$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.Prop[1], prepend_p = TRUE)` $\rightarrow$ Compatible with a proportional effect
+* $X_4$: `r gtsummary::style_pvalue(cox_aalen_fit$pval.Prop[2], prepend_p = TRUE)` $\rightarrow$ Compatible with a proportional effect
+
+```{r }
+# Plot additive Aalen terms
+plot(cox_aalen_fit, ylim = c(-0.5,5))
+
+# Plot multiplicative terms 
+plot(cox_aalen_fit,  score= TRUE) 
+```
+
+---
+
+We simulated $R=1000$ datasets. 
+
+```{r}
+test_cox_aalen <- replicate(R, {
+  # Generate data 
+  data <- simulate_cox_aalen_data(n, lambda0, alpha, beta,
+                                  prev_add, sigma_add, prev_mult, mean_mult,
+                                  sigma_mult_bin, sigma_mult_cont, c_max)
+  # Estimate prevalences 
+  prev <- colMeans(data %>% dplyr::select(X1:X3))%>%
+    stats::setNames(paste0("prev_", names(.)))
+  # Mean and sd Z3
+  mean_sd_Z3 <- stats::setNames(c(mean(data$Z3), sd(data$Z3)),
+                                c("mean_Z3","sd_Z3"))
+  # Censoring rate 
+  cens_rate <- stats::setNames(mean(1 - data$event), "cens_rate")
+  # Fit Cox-Aalen model
+  fit_obj <- timereg::cox.aalen(
+    Surv(time, event)~X1+X2+X3+prop(Z1)+prop(Z2)+prop(Z3),
+    data = data, n.sim = 1000, basesim = 1
+  )
+  # Additive terms 
+  pval_supremum <- fit_obj[["pval.testBeq0"]] 
+  names(pval_supremum) <- paste0("pval_supremum_", names(pval_supremum)) 
+  pval_KS <- fit_obj[["pval.testBeqC"]] 
+  names(pval_KS) <- paste0("pval_KS_", names(pval_KS)) 
+  # pval_CvM <- fit_obj[["pval.testBeqC.is"]] 
+  # names(pval_CvM) <- paste0("pval_CvM", names(pval_CvM))
+  # Multiplicative terms 
+  coef <- coef(fit_obj)[,"Coef."]
+  # Test for proportional 
+  pval_prop <- stats::setNames(
+    fit_obj$pval.Prop, 
+    gsub("prop\\(|\\)","", paste0("pval_prop_", names(fit_obj$pval.Prop)))
+    )
+  
+  c(prev, mean_sd_Z3, cens_rate, 
+    pval_supremum, pval_KS, #pval_CvM, 
+    coef, pval_prop)
+  
+  }, simplify = F)%>%
+  bind_rows()
+
+data.frame(round(colMeans(test_cox_aalen),3))%>%
+  tibble::rownames_to_column()%>%
+  kable(col.names = c("Name","Value"))
+
+test_cox_aalen %>%
+  dplyr::select(starts_with("pval"))%>%
+  dplyr::mutate(across(everything(), ~ifelse(.x<0.05, 1, 0)))%>%
+  dplyr::summarise_all(mean)%>%
+  tidyr::pivot_longer(everything())%>%
+  mutate(value = round(value, 3))%>%
+  kable(col.names = c("p-value","Rejection probability"))
 ```
 
 ## Variable importance
@@ -417,6 +700,9 @@ required for VIM computation:
 We define time horizons, maximum follow-up time and times at which to approximate integrals.
 
 ```{r}
+time <- data_scen2$time
+event <- data_scen2$event
+X <- data_scen2 %>% dplyr::select(starts_with(c("X","Z")))
 surv_cox_aalen_fit <- survival::survfit(survival::Surv(time, event)~1)
 landmark_times <- quantile(surv_cox_aalen_fit, 
                            probs = c(#0.25, 
@@ -619,143 +905,26 @@ kable(vim_cox_aalen_scen2 %>%
       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
+### Survival Super Learner 
 
-# Additional numerical experiments 
-
-## Sensitivity to low prevalence 
-
-### Objectives
-
-This scenario aims to evaluate the overall performance of the VIM procedure to ***rare alterations*** exhibiting ***heterogeneous effect sizes (ranging from weak to strong)*** under an additive ***Aalen model*** and a mixed additive and multiplicative ***Cox-Aaalen model***. More specifically, the objective is to assess whether the VIM approach can:
-
-* detect rare yet highly prognostic alterations,
-* discriminate between weak and strong prognostic signals, and
-* correctly identify non-informative (null) variables.
-
-### Data generating mechanism
-
-All covariates were generated independently as binary variables: 
-
-$$X_j \sim \mathcal{B}(\pi_j)$$ with $\pi \in {\{0.01, 0.1\}}$ to reflect genomic rarity. 
-
-The event times follows a proportional hazards model with a with constant baseline hazard $\lambda_0(t) = 0.1$ such that
-
-$$
-\lambda(t \mid X) = \lambda_0(t)\exp(X^\top \beta).
-$$
-
-Covariates were partitioned according to both their prevalence and prognostic effect size, resulting in the following combinations:
-
-```{r echo=FALSE}
-knitr::kable(
-  data.frame(
-    `Alteration frequency` = c(
-      rep("Very rare ($\\pi = 0.01$)", 5),
-      rep("Rare ($\\pi = 0.10$)", 5)
-    ),
-    `Effect category` = c(
-      "Strong", "Strong", "Moderate", "Weak", "Null",
-      "Strong", "Strong", "Moderate", "Weak", "Null"
-    ),
-    `Hazard ratio` = c(
-      3.0, 2.0, 1.5, 1.2, 1.0,
-      3.0, 2.0, 1.5, 1.2, 1.0
-    ),
-    `Regression coefficient` = c(
-      "$\\log(3)$",
-      "$\\log(2)$",
-      "$\\log(1.5)$",
-      "$\\log(1.2)$",
-      "$0$",
-      "$\\log(3)$",
-      "$\\log(2)$",
-      "$\\log(1.5)$",
-      "$\\log(1.2)$",
-      "$0$"
-    )
-  ),
-  escape = FALSE,
-  align = "llcc",
-  col.names = c("Alteration frequency","Effect category","HR","$\\beta$")
-)
-```
-
-This design allows us to assess whether the VIM procedure can detect rare but strongly prognostic alterations, distinguish weak from moderate and strong effects, and correctly assign low importance to null variables.
-
-Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the data-generating mechanism to achieve an expected censoring proportion of approximately 20%, and the calibrated value was then fixed across all 
-simulation replicates. 
-
-```{r}
-p <- 10 
-prev <- c(rep(0.01, 5), rep(0.1, 5))
-beta <- rep(c(log(3), log(2), log(1.5), log(1.2), 0), 2)
-sigma <- diag(x = 1, nrow = p, ncol = p)
-lambda0 <- 0.1
-target_cens <- 0.2
-c_max_scen3 <- calibrate_c_max_cox(lambda0     = lambda0,
-                                   beta        = beta,
-                                   prev        = prev,
-                                   sigma       = sigma,
-                                   target_cens = target_cens,
-                                   seed        = 2026)
-c_max_scen3
-data_scen3 <- simulate_cox_data(n, prev, sigma, lambda0, beta, c_max_scen3)
-head(data_scen3)
-
-# Check empirical prevalences
-round(colMeans(data_scen3 %>% dplyr::select(starts_with("X"))), 3)
-
-# Check censoring
-mean(1 - data_scen3$event)
-
-# Cox PH model
-coxph_fit <- coxph(Surv(time, event)~., data_scen3)
-summary(coxph_fit)
-
-time <- data_scen3$time
-event <- data_scen3$event
-X <- data_scen3 %>% dplyr::select(starts_with("X"))
-```
-
-### Variable importance 
-
-We define time horizons, maximum follow-up time and times at which to approximate integrals.
-
-```{r}
-landmark_times <- quantile(time, c(0.25, 0.75))
-approx_times <- sort(unique(c(0, time[event == 1], landmark_times)))
-approx_times <- approx_times[approx_times <= max(landmark_times)]
-length(approx_times)
-```
-
-We generated cross-fitting and sample-splitting folds.
-
-```{r}
-folds <- survML:::generate_folds(n, V, sample_split)
-cf_folds <- folds$cf_folds
-table(cf_folds)
-ss_folds <- folds$ss_folds
-table(ss_folds)
-```
-
-```{r}
-V0_stackG_preds_scen3 <- CV_generate_full_predictions_landmark(
+```{r eval=FALSE}
+V0_survivalSL_preds_scen2 <- CV_generate_full_predictions_landmark(
   time = time,
   event = event,
   X = X,
   landmark_times = landmark_times,
   approx_times = approx_times,
-  nuisance = "stackG",
+  nuisance = "survivalSL",
   cf_folds = cf_folds)
-# str(V0_stackG_preds_scen3)
+# str(V0_stackG_preds_scen2)
 
-CV_full_preds <- V0_stackG_preds_scen3$CV_full_preds
-CV_full_preds_train <- V0_stackG_preds_scen3$CV_full_preds_train
-CV_S_preds <- V0_stackG_preds_scen3$CV_S_preds
-CV_G_preds <- V0_stackG_preds_scen3$CV_G_preds
+CV_full_preds <- V0_survivalSL_preds_scen2$CV_full_preds
+CV_full_preds_train <- V0_survivalSL_preds_scen2$CV_full_preds_train
+CV_S_preds <- V0_survivalSL_preds_scen2$CV_S_preds
+CV_G_preds <- V0_survivalSL_preds_scen2$CV_G_preds
 
 indxs <- 1:ncol(X)
-vim_stackG_scen3 <- purrr::map_dfr(indxs, function(indx_i) {
+vim_survivalSL_scen2 <- purrr::map_dfr(indxs, function(indx_i) {
   
   char_indx <- as.character(indx_i)
   indx <- as.numeric(strsplit(char_indx, split = ",")[[1]])
@@ -810,7 +979,7 @@ vim_stackG_scen3 <- purrr::map_dfr(indxs, function(indx_i) {
   })
 })
 
-kable(vim_stackG_scen3 %>% 
+kable(vim_survivalSL_scen2 %>% 
         dplyr::filter(vim == "AUC")%>%
         tibble::remove_rownames()%>%
         mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
@@ -818,7 +987,7 @@ kable(vim_stackG_scen3 %>%
         dplyr::relocate(indx, landmark_time),
       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC"))
 
-kable(vim_stackG_scen3 %>% 
+kable(vim_survivalSL_scen2 %>% 
         dplyr::filter(vim == "brier")%>%
         tibble::remove_rownames()%>%
         mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>%
@@ -827,7 +996,215 @@ kable(vim_stackG_scen3 %>%
       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier"))
 ```
 
-## Sensitivity to covariate correlations 
+
+<!-- # Additional numerical experiments  -->
+
+<!-- ## Sensitivity to low-prevalence covariates  -->
+
+<!-- ### Objectives -->
+
+<!-- This scenario aims to evaluate the overall performance of the VIM procedure to ***rare alterations*** exhibiting ***heterogeneous effect sizes (ranging from weak to strong)*** under an additive ***Aalen model*** and a mixed additive and multiplicative ***Cox-Aaalen model***. More specifically, the objective is to assess whether the VIM approach can: -->
+
+<!-- * detect rare yet highly prognostic alterations, -->
+<!-- * discriminate between weak and strong prognostic signals, and -->
+<!-- * correctly identify non-informative (null) variables. -->
+
+<!-- ### Data generating mechanism -->
+
+<!-- All covariates were generated independently as binary variables:  -->
+
+<!-- $$X_j \sim \mathcal{B}(\pi_j)$$ with $\pi \in {\{0.01, 0.1\}}$ to reflect genomic rarity.  -->
+
+<!-- The event times follows a proportional hazards model with a with constant baseline hazard $\lambda_0(t) = 0.1$ such that -->
+
+<!-- $$ -->
+<!-- \lambda(t \mid X) = \lambda_0(t)\exp(X^\top \beta). -->
+<!-- $$ -->
+
+<!-- Covariates were partitioned according to both their prevalence and prognostic effect size, resulting in the following combinations: -->
+
+<!-- ```{r echo=FALSE} -->
+<!-- knitr::kable( -->
+<!--   data.frame( -->
+<!--     `Alteration frequency` = c( -->
+<!--       rep("Very rare ($\\pi = 0.01$)", 5), -->
+<!--       rep("Rare ($\\pi = 0.10$)", 5) -->
+<!--     ), -->
+<!--     `Effect category` = c( -->
+<!--       "Strong", "Strong", "Moderate", "Weak", "Null", -->
+<!--       "Strong", "Strong", "Moderate", "Weak", "Null" -->
+<!--     ), -->
+<!--     `Hazard ratio` = c( -->
+<!--       3.0, 2.0, 1.5, 1.2, 1.0, -->
+<!--       3.0, 2.0, 1.5, 1.2, 1.0 -->
+<!--     ), -->
+<!--     `Regression coefficient` = c( -->
+<!--       "$\\log(3)$", -->
+<!--       "$\\log(2)$", -->
+<!--       "$\\log(1.5)$", -->
+<!--       "$\\log(1.2)$", -->
+<!--       "$0$", -->
+<!--       "$\\log(3)$", -->
+<!--       "$\\log(2)$", -->
+<!--       "$\\log(1.5)$", -->
+<!--       "$\\log(1.2)$", -->
+<!--       "$0$" -->
+<!--     ) -->
+<!--   ), -->
+<!--   escape = FALSE, -->
+<!--   align = "llcc", -->
+<!--   col.names = c("Alteration frequency","Effect category","HR","$\\beta$") -->
+<!-- ) -->
+<!-- ``` -->
+
+<!-- This design allows us to assess whether the VIM procedure can detect rare but strongly prognostic alterations, distinguish weak from moderate and strong effects, and correctly assign low importance to null variables. -->
+
+<!-- Independent censoring times were generated as $C \sim Uniform(0, c_{max})$. The parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the data-generating mechanism to achieve an expected censoring proportion of approximately 20%, and the calibrated value was then fixed across all  -->
+<!-- simulation replicates.  -->
+
+<!-- ```{r} -->
+<!-- p <- 10  -->
+<!-- prev <- c(rep(0.01, 5), rep(0.1, 5)) -->
+<!-- beta <- rep(c(log(3), log(2), log(1.5), log(1.2), 0), 2) -->
+<!-- sigma <- diag(x = 1, nrow = p, ncol = p) -->
+<!-- lambda0 <- 0.1 -->
+<!-- target_cens <- 0.2 -->
+<!-- c_max_scen3 <- calibrate_c_max_cox(lambda0     = lambda0, -->
+<!--                                    beta        = beta, -->
+<!--                                    prev        = prev, -->
+<!--                                    sigma       = sigma, -->
+<!--                                    target_cens = target_cens, -->
+<!--                                    seed        = 2026) -->
+<!-- c_max_scen3 -->
+<!-- data_scen3 <- simulate_cox_data(n, prev, sigma, lambda0, beta, c_max_scen3) -->
+<!-- head(data_scen3) -->
+
+<!-- # Check empirical prevalences -->
+<!-- round(colMeans(data_scen3 %>% dplyr::select(starts_with("X"))), 3) -->
+
+<!-- # Check censoring -->
+<!-- mean(1 - data_scen3$event) -->
+
+<!-- # Cox PH model -->
+<!-- coxph_fit <- coxph(Surv(time, event)~., data_scen3) -->
+<!-- summary(coxph_fit) -->
+
+<!-- time <- data_scen3$time -->
+<!-- event <- data_scen3$event -->
+<!-- X <- data_scen3 %>% dplyr::select(starts_with("X")) -->
+<!-- ``` -->
+
+<!-- ### Variable importance  -->
+
+<!-- We define time horizons, maximum follow-up time and times at which to approximate integrals. -->
+
+<!-- ```{r} -->
+<!-- landmark_times <- quantile(time, c(0.25, 0.75)) -->
+<!-- approx_times <- sort(unique(c(0, time[event == 1], landmark_times))) -->
+<!-- approx_times <- approx_times[approx_times <= max(landmark_times)] -->
+<!-- length(approx_times) -->
+<!-- ``` -->
+
+<!-- We generated cross-fitting and sample-splitting folds. -->
+
+<!-- ```{r} -->
+<!-- folds <- survML:::generate_folds(n, V, sample_split) -->
+<!-- cf_folds <- folds$cf_folds -->
+<!-- table(cf_folds) -->
+<!-- ss_folds <- folds$ss_folds -->
+<!-- table(ss_folds) -->
+<!-- ``` -->
+
+<!-- ```{r} -->
+<!-- V0_stackG_preds_scen3 <- CV_generate_full_predictions_landmark( -->
+<!--   time = time, -->
+<!--   event = event, -->
+<!--   X = X, -->
+<!--   landmark_times = landmark_times, -->
+<!--   approx_times = approx_times, -->
+<!--   nuisance = "stackG", -->
+<!--   cf_folds = cf_folds) -->
+<!-- # str(V0_stackG_preds_scen3) -->
+
+<!-- CV_full_preds <- V0_stackG_preds_scen3$CV_full_preds -->
+<!-- CV_full_preds_train <- V0_stackG_preds_scen3$CV_full_preds_train -->
+<!-- CV_S_preds <- V0_stackG_preds_scen3$CV_S_preds -->
+<!-- CV_G_preds <- V0_stackG_preds_scen3$CV_G_preds -->
+
+<!-- indxs <- 1:ncol(X) -->
+<!-- vim_stackG_scen3 <- purrr::map_dfr(indxs, function(indx_i) { -->
+
+<!--   char_indx <- as.character(indx_i) -->
+<!--   indx <- as.numeric(strsplit(char_indx, split = ",")[[1]]) -->
+
+<!--   CV_reduced_preds <- CV_generate_reduced_predictions_landmark( -->
+<!--     time = time, -->
+<!--     event = event, -->
+<!--     X = X, -->
+<!--     landmark_times = landmark_times, -->
+<!--     cf_folds = cf_folds, -->
+<!--     indx = indx, -->
+<!--     full_preds_train = CV_full_preds_train -->
+<!--   ) -->
+
+<!--   purrr::map_dfr(vims, function(vim) { -->
+
+<!--     output <- switch( -->
+<!--       vim, -->
+<!--       brier = survML::vim_brier( -->
+<!--         time = time, -->
+<!--         event = event, -->
+<!--         approx_times = approx_times, -->
+<!--         landmark_times = landmark_times, -->
+<!--         f_hat = CV_full_preds, -->
+<!--         fs_hat = CV_reduced_preds, -->
+<!--         S_hat = CV_S_preds, -->
+<!--         G_hat = CV_G_preds, -->
+<!--         cf_folds = cf_folds, -->
+<!--         sample_split = sample_split,  -->
+<!--         ss_folds = ss_folds -->
+<!--       ), -->
+<!--       AUC = survML::vim_AUC( -->
+<!--         time = time, -->
+<!--         event = event, -->
+<!--         approx_times = approx_times, -->
+<!--         landmark_times = landmark_times, -->
+<!--         f_hat = purrr::map(CV_full_preds, ~ 1 - .x), -->
+<!--         fs_hat = purrr::map(CV_reduced_preds, ~ 1 - .x), -->
+<!--         S_hat = CV_S_preds, -->
+<!--         G_hat = CV_G_preds, -->
+<!--         cf_folds = cf_folds, -->
+<!--         sample_split = sample_split,  -->
+<!--         ss_folds = ss_folds -->
+<!--       ) -->
+<!--     ) -->
+
+<!--     output %>%  -->
+<!--       dplyr::mutate( -->
+<!--         vim = vim, -->
+<!--         indx = char_indx -->
+<!--       ) -->
+<!--   }) -->
+<!-- }) -->
+
+<!-- kable(vim_stackG_scen3 %>%  -->
+<!--         dplyr::filter(vim == "AUC")%>% -->
+<!--         tibble::remove_rownames()%>% -->
+<!--         mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>% -->
+<!--         dplyr::select(-c(cil_1sided, vim))%>% -->
+<!--         dplyr::relocate(indx, landmark_time), -->
+<!--       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large AUC","small AUC")) -->
+
+<!-- kable(vim_stackG_scen3 %>%  -->
+<!--         dplyr::filter(vim == "brier")%>% -->
+<!--         tibble::remove_rownames()%>% -->
+<!--         mutate(across(c(landmark_time:small_predictiveness), ~round(.x, 3)))%>% -->
+<!--         dplyr::select(-c(cil_1sided, vim))%>% -->
+<!--         dplyr::relocate(indx, landmark_time), -->
+<!--       col.names = c("Variable","Horizon","VIM","var(VIM)","CIL","CIU","p","large Brier","small Brier")) -->
+<!-- ``` -->
+
+<!-- ## Sensitivity to covariate correlations  -->
 
 <!-- ### Additive hazards -->
 
@@ -841,7 +1218,7 @@ kable(vim_stackG_scen3 %>%
 
 <!-- #### Cox-Aalen model -->
 
-## Exclusion versus permutation variable importance
+<!-- ## Exclusion versus permutation variable importance -->
 
 <!-- ### Aalen hazards -->
 

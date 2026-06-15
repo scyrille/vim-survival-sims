@@ -86,10 +86,72 @@ generate_full_predictions <- function(time,
     f_hat_train <- S_hat_train[,which(approx_times %in% landmark_times),drop=FALSE]
 
   }
-  # 
-  # else if (nuisance == "survivalSL"){
-  #   
-  # }
+  else if (nuisance == "survivalSL"){
+    
+    methods <- c("LIB_COXall", "LIB_PHexponential", "LIB_RSF") 
+    
+    get_survSL_mat <- function(fit, newdata, approx_times) {
+      pred <- predict(fit, newdata = newdata)
+      
+      mat <- pred$predictions$sl
+      tt  <- pred$times
+      
+      t(apply(mat, 1, function(s) {
+        approx(x = tt, y = s, xout = approx_times, rule = 2)$y
+      }))
+    }
+    
+    datS <- data.frame(
+      times    = time,
+      failures = event,
+      X
+    )
+    
+    S_fit <- survivalSL::survivalSL(
+      methods = methods,
+      metric  = "ibs",
+      data    = datS,
+      times   = "times",
+      failures = "failures",
+      cov.quanti = colnames(X),
+      cov.quali  = NULL,
+      cv = 5,
+      keep.predictions = FALSE,
+      progress = FALSE
+    )
+    
+    cens_event <- 1 - event
+    
+    datG <- data.frame(
+      times    = time,
+      failures = cens_event,
+      X
+    )
+    
+    G_fit <- survivalSL::survivalSL(
+      methods = methods,
+      metric  = "ibs",
+      data    = datG,
+      times   = "times",
+      failures = "failures",
+      cov.quanti = colnames(X),
+      cov.quali  = NULL,
+      cv = 5,
+      keep.predictions = FALSE,
+      progress = FALSE
+    )
+    
+    S_hat <- get_survSL_mat(S_fit, X_holdout, approx_times)
+    G_hat <- get_survSL_mat(G_fit, X_holdout, approx_times)
+    
+    S_hat_train <- get_survSL_mat(S_fit, X, approx_times)
+    G_hat_train <- get_survSL_mat(G_fit, X, approx_times)
+    
+    idx_landmark <- match(landmark_times, approx_times)
+    
+    f_hat <- S_hat[, idx_landmark, drop = FALSE]
+    f_hat_train <- S_hat_train[, idx_landmark, drop = FALSE]
+  }
   
   return(list(S_hat = S_hat,
               G_hat = G_hat,

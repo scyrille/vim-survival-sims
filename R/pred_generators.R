@@ -88,7 +88,11 @@ generate_full_predictions <- function(time,
   }
   else if (nuisance == "survivalSL"){
     
-    methods <- c("LIB_COXall", "LIB_PHexponential", "LIB_RSF") 
+    methods <- c("LIB_COXall", 
+                 "LIB_PHexponential", 
+                 "LIB_RSF",
+                 "LIB_PLANN"
+                 ) 
     
     get_survSL_mat <- function(fit, newdata, approx_times) {
       pred <- predict(fit, newdata = newdata)
@@ -101,44 +105,36 @@ generate_full_predictions <- function(time,
       }))
     }
     
-    datS <- data.frame(
-      times    = time,
-      failures = event,
-      X
-    )
+    x_vars <- colnames(X)
     
+    # Event model: S(t|X) 
+    datS <- data.frame(time = time, event = event, X)
+    
+    formS <- as.formula(
+      paste("Surv(time, event) ~", paste(x_vars, collapse = " + "))
+    )
+
     S_fit <- survivalSL::survivalSL(
-      methods = methods,
-      metric  = "ibs",
+      formula = formS,
       data    = datS,
-      times   = "times",
-      failures = "failures",
-      cov.quanti = colnames(X),
-      cov.quali  = NULL,
-      cv = 5,
-      keep.predictions = FALSE,
-      progress = FALSE
+      metric  = "auc",
+      methods = methods, 
+      cv = 5
     )
     
+    # Censoring model: G(t|X) 
     cens_event <- 1 - event
-    
-    datG <- data.frame(
-      times    = time,
-      failures = cens_event,
-      X
+    datG <- data.frame(time = time, cens_event = cens_event, X)
+    formG <- as.formula(
+      paste("Surv(time, cens_event) ~", paste(x_vars, collapse = " + "))
     )
     
     G_fit <- survivalSL::survivalSL(
-      methods = methods,
-      metric  = "ibs",
+      formula = formG,
       data    = datG,
-      times   = "times",
-      failures = "failures",
-      cov.quanti = colnames(X),
-      cov.quali  = NULL,
-      cv = 5,
-      keep.predictions = FALSE,
-      progress = FALSE
+      metric  = "auc",
+      methods = methods, 
+      cv = 5
     )
     
     S_hat <- get_survSL_mat(S_fit, X_holdout, approx_times)
@@ -254,3 +250,4 @@ CV_generate_reduced_predictions_landmark <- function(time,
     }) %>% as.matrix()
   })
 }
+

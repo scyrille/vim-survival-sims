@@ -206,13 +206,14 @@ simulate_aalen_data <- function(n, prev, sigma, lambda0, alpha, c_max) {
     )
   }
   
-  U <- runif(n)
-  T <- -log(U) / lambdaX
+  # ------ Event times ----- #
+  haz <- as.numeric(lambda0 + X %*% alpha)
+  T <- rexp(n, rate = haz)
   
-  # Generate censoring times
+  # --------- Censoring times --------- #
   C <- runif(n, min = 0, max = c_max)
   
-  # Observed data
+  # --------- Observed data --------- #
   time <- pmin(T, C)
   event <- as.integer(T <= C)
   
@@ -294,18 +295,15 @@ simulate_cox_aalen_data <- function(n,
   X_mult <- as.matrix(X_mult)
   colnames(X_mult) <- paste0("Z", seq_len(p_mult))
   
-  # --------- Hazard components --------- #
-  add_part <- as.vector(lambda0 + X_add %*% alpha)
-  
-  if (any(add_part <= 0)) {
-    stop("Some values of the additive part are <= 0. Increase lambda0 or modify alpha.")
-  }
-  
-  lambda_i <- as.vector(exp(X_mult %*% beta) * add_part)
-  
   # --------- Event times --------- #
-  U <- runif(n)
-  T <- -log(U) / lambda_i
+  haz_add <- as.numeric(lambda0 + X_add %*% alpha)
+  
+  if (any(haz_add < 0))
+    warning(sum(haz_add < 0),
+            " subjects with negative additive hazard.")
+  
+  haz <- pmax(haz_add, 0) * exp(as.numeric(X_mult %*% beta))
+  T <- rexp(n, rate = haz)
   
   # --------- Censoring times --------- #
   C <- runif(n, min = 0, max = c_max)
@@ -320,7 +318,7 @@ simulate_cox_aalen_data <- function(n,
 #' Calibrate the upper bound of a Uniform censoring distribution
 #' to achieve a target censoring proportion under a Cox proportional hazards model.
 #'
-#' @param n_cal Integer. Number of individuals used in the Monte Carlo calibration step.
+#' @param n_mc Integer. Number of individuals used in the Monte Carlo calibration step.
 #' @param lambda0 Numeric. Constant baseline hazard.
 #' @param beta Numeric vector of log-hazard ratios.
 #' @param prev Numeric vector of marginal prevalences of the binary covariates.
@@ -335,7 +333,7 @@ simulate_cox_aalen_data <- function(n,
 #'
 #' @export
 calibrate_c_max_cox <- function(
-    n_cal = 200000,
+    n_mc = 200000,
     lambda0 = 0.1,
     beta,
     prev,
@@ -355,7 +353,7 @@ calibrate_c_max_cox <- function(
   stopifnot(target_cens > 0, target_cens < 1)
   
   # ------ Simulate binary covariates ----- #
-  Z <- MASS::mvrnorm(n = n_cal, mu = rep(0, p), Sigma = sigma)
+  Z <- MASS::mvrnorm(n = n_mc, mu = rep(0, p), Sigma = sigma)
   
   # Thresholds matching marginal prevalences
   thresholds <- qnorm(prev)
@@ -371,7 +369,7 @@ calibrate_c_max_cox <- function(
   lambdaX <- lambda0 * exp(linpred)
   
   # ------ Event times ----- #
-  U <- runif(n_cal)
+  U <- runif(n_mc)
   T <- -log(U) / lambdaX
   
   # ------ Expected censoring proportion under C ~ Uniform(0, c_max) ----- #
@@ -401,7 +399,7 @@ calibrate_c_max_cox <- function(
 #' Calibrate the upper bound of a Uniform censoring distribution
 #' to achieve a target censoring proportion under an Aalen additive model.
 #'
-#' @param n_cal Integer. Number of individuals used in the Monte Carlo calibration step.
+#' @param n_mc Integer. Number of individuals used in the Monte Carlo calibration step.
 #' @param lambda0 Numeric. Constant baseline hazard.
 #' @param alpha Numeric vector of additive regression coefficients.
 #' @param prev Numeric vector of marginal prevalences of the binary covariates.
@@ -417,7 +415,7 @@ calibrate_c_max_cox <- function(
 #'
 #' @export
 calibrate_c_max_aalen <- function(
-    n_cal = 200000,
+    n_mc = 200000,
     lambda0 = 0.05,
     alpha = c(0.06, 0.02, 0.005, 0),
     prev = c(0.005, 0.02, 0.05, 0.20),
@@ -445,7 +443,7 @@ calibrate_c_max_aalen <- function(
   }
   
   # ------ Simulate binary covariates ----- #
-  Z <- MASS::mvrnorm(n = n_cal, mu = rep(0, p), Sigma = sigma)
+  Z <- MASS::mvrnorm(n = n_mc, mu = rep(0, p), Sigma = sigma)
   
   # Thresholds matching marginal prevalences
   thresholds <- qnorm(prev)
@@ -466,8 +464,8 @@ calibrate_c_max_aalen <- function(
   }
   
   # ------ Event times ----- #
-  U <- runif(n_cal)
-  T <- -log(U) / lambdaX
+  haz <- as.numeric(lambda0 + X %*% alpha)
+  T <- rexp(n_mc, rate = haz)
   
   # ------ Expected censoring proportion under C ~ Uniform(0, cmax) ----- #
   cens_rate_det <- function(cmax) {
@@ -494,7 +492,7 @@ calibrate_c_max_aalen <- function(
 #' Calibrate the upper bound of a Uniform censoring distribution
 #' to achieve a target censoring proportion under a Cox-Aalen model.
 #'
-#' @param n_cal Integer. Number of individuals used in the Monte Carlo calibration step.
+#' @param n_mc Integer. Number of individuals used in the Monte Carlo calibration step.
 #' @param lambda0 Constant baseline hazard in the additive part.
 #' @param alpha Numeric vector of additive regression coefficients.
 #' @param beta Numeric vector of multiplicative regression coefficients.
@@ -514,7 +512,7 @@ calibrate_c_max_aalen <- function(
 #'
 #' @export
 calibrate_c_max_cox_aalen <- function(
-    n_cal = 200000,
+    n_mc = 200000,
     lambda0,
     alpha,
     beta,
@@ -557,7 +555,7 @@ calibrate_c_max_cox_aalen <- function(
   
   # ---------- Additive covariates (binary) ---------- #
   Z_add <- MASS::mvrnorm(
-    n = n_cal,
+    n = n_mc,
     mu = rep(0, p_add),
     Sigma = sigma_add
   )
@@ -569,7 +567,7 @@ calibrate_c_max_cox_aalen <- function(
   # ---------- Multiplicative covariates ---------- #
   ## Binary
   Z_mult_bin <- MASS::mvrnorm(
-    n = n_cal,
+    n = n_mc,
     mu = rep(0, p_mult_bin),
     Sigma = sigma_mult_bin
   )
@@ -581,7 +579,7 @@ calibrate_c_max_cox_aalen <- function(
   ## Continuous
   X_mult_cont <- scale(
     MASS::mvrnorm(
-      n = n_cal,
+      n = n_mc,
       mu = mean_mult,
       Sigma = sigma_mult_cont
     )
@@ -593,20 +591,18 @@ calibrate_c_max_cox_aalen <- function(
   X_mult <- as.matrix(X_mult)
   
   # ---------- Individual hazards ---------- #
-  add_part <- as.vector(lambda0 + X_add %*% alpha)
+  haz_add <- as.vector(lambda0 + X_add %*% alpha)
   
-  if (any(add_part <= 0)) {
+  if (any(haz_add <= 0)) {
     stop(
       "Some sampled values of the additive part are <= 0. ",
       "Increase lambda0 or modify alpha."
     )
   }
   
-  lambda_i <- as.vector(exp(X_mult %*% beta) * add_part)
-  
-  # ---------- Event times ---------- #
-  U <- runif(n_cal)
-  T <- -log(U) / lambda_i
+  # --------- Event times --------- #
+  haz <- pmax(haz_add, 0) * exp(as.numeric(X_mult %*% beta))
+  T <- rexp(n_mc, rate = haz)
   
   # ---------- Expected censoring under C ~ Uniform(0, cmax) ---------- #
   cens_rate_det <- function(cmax) {
@@ -627,5 +623,117 @@ calibrate_c_max_cox_aalen <- function(
   }
   
   uniroot(f, interval = c(lower, upper))$root
+}
+
+get_params_scenario <- function(scenario, n_mc, seed){
+  
+  if (scenario == "1"){
+    
+    p           = 4
+    lambda0     = 0.05 
+    alpha       = c(0.1,    # strong
+                    0.05,   # moderate
+                    0.005,  # weak
+                    0)      # null, 
+    sigma       = diag(x = 1, nrow = 4, ncol = 4)
+    prev        = rep(0.4, 4)
+    target_cens = 0.2
+    
+    c_max <- calibrate_c_max_aalen(n_mc        = n_mc,
+                                   lambda0     = lambda0,
+                                   alpha       = alpha,
+                                   prev        = prev, 
+                                   sigma       = sigma,
+                                   target_cens = target_cens,
+                                   seed        = seed)
+    
+    params = list(p           = p,
+                  lambda0     = lambda0, 
+                  alpha       = alpha,
+                  sigma       = sigma, 
+                  prev        = prev,
+                  target_cens = target_cens, 
+                  c_max       = c_max)
+    
+    list2env(params, .GlobalEnv)
+    
+  } else if (scenario == "2"){
+    
+    p <- 6
+    prev_add <- c(0.4, 0.4, 0.4)
+    sigma_add <- diag(x = 1, nrow = 3, ncol = 3)
+    alpha <- c(0.1,  # strong
+               0.05, # intermediate
+               0)    # null
+    prev_mult <- c(0.4, 0.4)
+    sigma_mult_bin <- diag(x = 1, nrow = 2, ncol = 2)
+    mean_mult <- 0
+    sigma_mult_cont <- diag(x = 1, nrow = 1, ncol = 1)
+    beta <- c(1,   # strong
+              0.5, # intermediate
+              0)   # null
+    lambda0 <- 0.05
+    target_cens <- 0.2
+    
+    c_max <- calibrate_c_max_cox_aalen(n_mc            = n_mc,
+                                       lambda0         = lambda0,
+                                       alpha           = alpha,
+                                       beta            = beta,
+                                       prev_add        = prev_add,
+                                       sigma_add       = sigma_add,
+                                       prev_mult       = prev_mult,
+                                       mean_mult       = mean_mult,
+                                       sigma_mult_bin  = sigma_mult_bin,
+                                       sigma_mult_cont = sigma_mult_cont,
+                                       target_cens     = target_cens,
+                                       seed            = seed)
+    
+    params = list(p               = p,
+                  lambda0         = lambda0,
+                  alpha           = alpha,
+                  beta            = beta,
+                  prev_add        = prev_add,
+                  sigma_add       = sigma_add,
+                  prev_mult       = prev_mult,
+                  mean_mult       = mean_mult,
+                  sigma_mult_bin  = sigma_mult_bin,
+                  sigma_mult_cont = sigma_mult_cont,
+                  target_cens     = target_cens,
+                  c_max           = c_max)
+    
+    list2env(params, .GlobalEnv)
+  }
+}
+
+
+generate_data <- function(n = 1000, scenario = "1", seed = 2026){
+  
+  if (scenario == "1"){
+    
+    get_params_scenario("1", n_mc = n, seed = seed)
+    data <- simulate_aalen_data(n       = n , 
+                                prev    = prev, 
+                                sigma   = sigma, 
+                                lambda0 = lambda0, 
+                                alpha   = alpha, 
+                                c_max   = c_max)
+  
+  } else if (scenario == "2"){
+    
+    get_params_scenario("2", n_mc = n, seed = seed)
+    data <- simulate_cox_aalen_data(n                = n,
+                                    lambda0          = lambda0, 
+                                    alpha            = alpha, 
+                                    beta             = beta,
+                                    prev_add         = prev_add, 
+                                    sigma_add        = sigma_add, 
+                                    prev_mult        = prev_mult, 
+                                    mean_mult        = mean_mult,
+                                    sigma_mult_bin   = sigma_mult_bin,
+                                    sigma_mult_cont  = sigma_mult_cont,
+                                    c_max            = c_max
+    )
+  }
+  return(data)
 }
 

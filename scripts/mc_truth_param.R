@@ -1,13 +1,12 @@
 
 #-------------------#
-#  TRUE VIM VALUES  #
+#  True VIM values  #
 #-------------------#
 
 library(tidyverse)
 library(here)
 
 source(here::here("R", "generate_data.R"))
-source(here::here("R", "pred_generators.R"))
 source(here::here("R", "mc_truth_helpers.R"))
 
 # Large Monte Carlo sample 
@@ -24,10 +23,10 @@ calibration_param <- readRDS(here::here("outputs","results",
 
 ## Generate data 
 data_1 <- generate_data(n = n, scenario = "1",
-                            c_max = calibration_param$params_1$c_max)
+                        c_max = calibration_param$params_1$c_max)
 
 ## True VIM values 
-true_param_scen1 <- purrr::map_dfr(calibration_param$params_1$tau, function(t) {
+true_param_1 <- purrr::map_dfr(calibration_param$params_1$tau, function(t) {
   
   y <- as.integer(data_1$time > t)
   xvars <- names(dplyr::select(data_1, starts_with("X")))
@@ -96,7 +95,7 @@ data_2 <- generate_data(n = n, scenario = "2",
                         c_max = calibration_param$params_2$c_max)
 
 ## True VIM values
-true_param_scen2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
+true_param_2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
   
   y <- as.integer(data_2$time > t)
   
@@ -149,10 +148,6 @@ true_param_scen2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
     
     tibble::tibble(
       variable = vj,
-      # type     = dplyr::case_when(
-      #   is_add  ~ "additive",
-      #   is_mult ~ "multiplicative"
-      # ),
       V_brier = -vimp::measure_mse(f_red, y)$point_est,
       V_auc   = cvAUC::AUC(f_red, y)
     )
@@ -164,7 +159,6 @@ true_param_scen2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
         vim       = "BS(t)",
         tau       = t,
         variable,
-        # type,
         V_full    = V_full_brier,
         V_reduced = V_brier,
         vim_value = pmax(V_full_brier - V_brier, 0)
@@ -175,7 +169,6 @@ true_param_scen2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
         vim       = "AUC(t)",
         tau       = t,
         variable,
-        # type,
         V_full    = V_full_auc,
         V_reduced = V_auc,
         vim_value = pmax(V_full_auc - V_auc, 0)
@@ -192,5 +185,5 @@ true_param_scen2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
 
 #--------- Save all files ----------#
 
-true_param <- bind_rows(true_param_scen1, true_param_scen2) 
+true_param <- bind_rows(true_param_1, true_param_2) 
 saveRDS(true_param, here::here("outputs","results","mc_truth_param.rds"))

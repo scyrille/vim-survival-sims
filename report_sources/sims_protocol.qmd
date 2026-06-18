@@ -15,6 +15,10 @@ link-citations: true
 ```{r}
 library(tidyverse)
 library(knitr)
+library(here)
+
+dir <- rprojroot::find_rstudio_root_file()
+true_param <- readRDS(here::here(dir, "outputs/results/mc_truth_param.rds"))
 ```
 
 # Introduction
@@ -149,8 +153,11 @@ Let $T$ denote the event time and $C$ an independent censoring time. The
 observed data consisted of $(Y,\Delta, X, Z)$, where:
 
 $$Y=min(T,C), \quad \Delta = \mathbb{I}(T \le C).$$
-Censoring times were generated independently from an exponential distribution 
-to achieve a target censoring proportion.
+Independent censoring times were generated as $C \sim \mathcal{U}(0, c_{max})$. 
+The parameter $c_{max}$ was calibrated using a large Monte Carlo sample from the 
+data-generating mechanism to achieve an expected censoring proportion of 
+approximately 20%, and the calibrated value was then fixed across all 
+simulation replicates.
 
 **Additive Aalen model**
 
@@ -360,13 +367,12 @@ estimates, from which we computed nominal 95% CI Wald-type confidence intervals.
 
 ## Time horizon 
 
-Variable importance was evaluated at a fixed time horizon, corresponding to 
-**75th percentiles** of the empirical observed event times (or 
-the Kaplan-Meier estimator to account for censoring). These represent a 
-late-risk horizon. Restricting the analysis to this quantile-based time point 
-reduces computational burden while ensuring that evaluation occurs in regions 
-with a sufficient number of individuals at risk, 
-thereby avoiding instability in the tail of the distribution.
+Variable importance was evaluated at a fixed time horizon corresponding to 
+the 75th percentile of the true event-time distribution, approximated using 
+a Monte Carlo sample of size $2×10^7$. This choice focuses inference on a 
+late-risk horizon while avoiding the numerical instability associated with 
+the tail of the survival distribution. Restricting evaluation to a single 
+horizon also substantially reduces computational burden.
 
 ## Performance metrics 
 
@@ -386,7 +392,7 @@ higher for the former.
 
 ## Oracle variable importance  
 
-We generated a large Monte Carlo sample ($n=200 000$) from the true 
+We generated a large Monte Carlo sample ($n=2 \times 10^7$) from the true 
 data-generating model to approximate population-level quantities. Using this 
 sample, we computed the oracle predictive performance as well as the oracle 
 VIM measure for each variables.
@@ -532,30 +538,39 @@ score ($BS(t)$) under this scenario are provided in
 
 ```{r}
 #| label: "tbl-true-vim-s1"
-#| tbl-cap: "Approximate true values of variable importance for S1"
+#| tbl-colwidths: [15, 10, 20, 20, 20]
 
-vars_aalen <- c("$X_1$", "$X_2$", "$X_3$", "$X_4$")
-vars_cox_aalen <- c("$\\psi_{X_1}$", "$\\psi_{X_2}$", "$\\psi_{X_3}$",
-                    "$\\psi_{Z_1}$", "$\\psi_{Z_2}$", "$\\psi_{Z_3}$")
+true_param %>%
+  dplyr::filter(scenario_id == "1")%>%
+  dplyr::select(vim, variable, V_full, V_reduced, vim_value)%>%
+  dplyr::mutate(variable = paste0("$",gsub("X","X_", variable), "$"))%>%
+  kable(digits = c(0,0,2,2,3), escape = FALSE, align = rep("l", 5),
+        caption = "Approximate values of variable importance for S1. $\\tau$=14.97.",
+        col.names = c("VIM type",
+                      "Variable",
+                      "$\\widetilde{V}^{\\mathrm{MC}}(f_0)$",
+                      "$\\widetilde{V}^{\\mathrm{MC}}(f_{0,-s})$",
+                      "$\\widetilde{\\psi}_{0,s}^{\\mathrm{MC}}$"))
 
-tibble(
-  vars = unlist(lapply(vars_aalen, 
-                       function(x) c(x, rep("", 2)))),
-  method = rep(c("Aalen",
-                 "survival Super Learner",
-                 "Global survival stacking"),
-               length(vars_aalen)),
-  auc_vim = rep(c("","",""), each = length(vars_aalen)),
-  brier_vim = rep(c("","",""), each = length(vars_aalen))
-)%>%
-  kable(
-    col.names = c("Variable",
-                  "Nuisance parameter estimation", 
-                  "AUC($t_{0.75}$) VIM",
-                  "BS($t_{0.75}$) VIM"),
-    align = rep("l", 4),
-    escape = FALSE
-  )
+# vars_aalen <- c("$X_1$", "$X_2$", "$X_3$", "$X_4$")
+# tibble(
+#   vars = unlist(lapply(vars_aalen, 
+#                        function(x) c(x, rep("", 2)))),
+#   method = rep(c("Aalen",
+#                  "survival Super Learner",
+#                  "Global survival stacking"),
+#                length(vars_aalen)),
+#   auc_vim = rep(c("","",""), each = length(vars_aalen)),
+#   brier_vim = rep(c("","",""), each = length(vars_aalen))
+# )%>%
+#   kable(
+#     col.names = c("Variable",
+#                   "Nuisance parameter estimation", 
+#                   "AUC($t_{0.75}$) VIM",
+#                   "BS($t_{0.75}$) VIM"),
+#     align = rep("l", 4),
+#     escape = FALSE
+#   )
 ```
 
 ## Scenario 2 (S2) - Mixed additive and multiplicative effects 
@@ -592,29 +607,41 @@ score ($BS(t)$) under this scenario are provided in
 
 ```{r}
 #| label: "tbl-true-vim-s2"
-#| tbl-cap: "Approximate true values of variable importance for S2"
+#| tbl-colwidths: [15, 10, 20, 20, 20]
+#| 
+true_param %>%
+  dplyr::filter(scenario_id == "2")%>%
+  dplyr::select(vim, variable, V_full, V_reduced, vim_value)%>%
+  dplyr::mutate(variable = paste0("$",gsub("X","X_", gsub("Z","Z_", variable)), "$"))%>%
+  kable(digits = c(0,0,2,2,3), escape = FALSE, align = rep("l", 5),
+        caption = "Approximate values of variable importance for S1. $\\tau$=9.10.",
+        col.names = c("VIM type",
+                      "Variable",
+                      "$\\widetilde{V}^{\\mathrm{MC}}(f_0)$",
+                      "$\\widetilde{V}^{\\mathrm{MC}}(f_{0,-s})$",
+                      "$\\widetilde{\\psi}_{0,s}^{\\mathrm{MC}}$"))
 
-vars_cox_aalen <- c("$X_1$", "$X_2$", "$X_3$",
-                    "$Z_1$", "$Z_2$", "$Z_3$")
-
-tibble(
-  vars = unlist(lapply(vars_cox_aalen, 
-                       function(x) c(x, rep("", 2)))),
-  method = rep(c("Cox-Aalen",
-                 "survival Super Learner",
-                 "Global survival stacking"),
-               length(vars_cox_aalen)),
-  auc_vim = rep(c("","",""), each = length(vars_cox_aalen)),
-  brier_vim = rep(c("","",""), each = length(vars_cox_aalen))
-)%>%
-  kable(
-    col.names = c("Variable",
-                  "Nuisance parameter estimation", 
-                  "AUC($t_{0.75}$) VIM",
-                  "BS($t_{0.75}$) VIM"),
-    align = rep("l", 4),
-    escape = FALSE
-  )
+# vars_cox_aalen <- c("$X_1$", "$X_2$", "$X_3$",
+#                     "$Z_1$", "$Z_2$", "$Z_3$")
+# 
+# tibble(
+#   vars = unlist(lapply(vars_cox_aalen, 
+#                        function(x) c(x, rep("", 2)))),
+#   method = rep(c("Cox-Aalen",
+#                  "survival Super Learner",
+#                  "Global survival stacking"),
+#                length(vars_cox_aalen)),
+#   auc_vim = rep(c("","",""), each = length(vars_cox_aalen)),
+#   brier_vim = rep(c("","",""), each = length(vars_cox_aalen))
+# )%>%
+#   kable(
+#     col.names = c("Variable",
+#                   "Nuisance parameter estimation", 
+#                   "AUC($t_{0.75}$) VIM",
+#                   "BS($t_{0.75}$) VIM"),
+#     align = rep("l", 4),
+#     escape = FALSE
+#   )
 ```
 
 ## Additional numerical experiments 

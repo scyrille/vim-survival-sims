@@ -9,8 +9,8 @@ get_scenario_param <- function(scenario){
                     0.05,   # moderate
                     0.005,  # weak
                     0)      # null, 
-    sigma       = diag(x = 1, nrow = 4, ncol = 4)
-    prev        = rep(0.4, 4)
+    sigma       = diag(x = 1, nrow = p, ncol = p)
+    prev        = rep(0.4, p)
     target_cens = 0.2
     
     params = list(p           = p,

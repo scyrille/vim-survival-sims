@@ -10,7 +10,7 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
     get_scenario_param("1")
     data <- generate_data(n = n, scenario = "1", c_max = c_max)
     
-  } else if (scenario == "1"){
+  } else if (scenario == "2"){
     
     get_scenario_param("2")
     data <- generate_data(n = n, scenario = "2", c_max = c_max)
@@ -49,7 +49,6 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
   shared_settings <- expand.grid(indx = indxs, vim = vims) 
   
   output <- purrr::map_dfr(indxs, function(indx_i) {
-    
     char_indx <- as.character(indx_i)
     indx <- as.numeric(strsplit(char_indx, split = ",")[[1]])
     variable <- names(X)[indx]
@@ -65,7 +64,6 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
     )
     
     purrr::map_dfr(vims, function(vim) {
-      
       output <- switch(
         vim,
         brier = survML::vim_brier(
@@ -78,9 +76,10 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
           S_hat = CV_S_preds,
           G_hat = CV_G_preds,
           cf_folds = cf_folds,
-          sample_split = sample_split, 
-          ss_folds = ss_folds
-        ),
+          sample_split = sample_split,
+          ss_folds = ss_folds#,
+          # scale_est = TRUE
+        ), 
         AUC = survML::vim_AUC(
           time = time,
           event = event,
@@ -91,23 +90,25 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
           S_hat = CV_S_preds,
           G_hat = CV_G_preds,
           cf_folds = cf_folds,
-          sample_split = sample_split, 
-          ss_folds = ss_folds
+          sample_split = sample_split,
+          ss_folds = ss_folds#,
+          # scale_est = TRUE
         )
       )
-      
-      output %>% 
+      output %>%
         dplyr::mutate(
           vim = vim,
-          # indx = char_indx,
           variable = variable
         )
     })
+      
   })
+  
   end <- Sys.time()
   runtime <- as.numeric(difftime(end, start, units = "mins"))
   output <- output %>%
-    dplyr::mutate(runtime = runtime, 
+    dplyr::mutate(scenario = scenario, 
+                  runtime = runtime, 
                   n = n, 
                   nuisance = nuisance)%>%
     dplyr::relocate(vim, variable)

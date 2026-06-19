@@ -1,6 +1,13 @@
 
-library(tidyverse)
 library(here)
+library(tidyverse)
+library(MASS)
+library(survML)
+library(SuperLearner)
+library(ranger)
+library(xgboost)
+library(timereg)
+library(survivalSL)
 
 source(here::here("R", "generate_data.R"))
 source(here::here("R", "pred_generators.R"))
@@ -15,7 +22,7 @@ calibration_param <- readRDS(here::here("outputs","results",
 R <- 2
 
 # Sample size 
-# n <- c(500,1000)
+# n <- c(500,1000,1500)
 n <- 100
 
 fs::dir_create(here::here("outputs", "results", "scenario1"))
@@ -23,7 +30,7 @@ fs::dir_create(here::here("outputs", "results", "scenario1"))
 c_max <- calibration_param$params_1$c_max
 tau <- calibration_param$params_1$tau
 
-nuisances <- c("stackG","aalen")
+nuisances <- c("stackG", "aalen")
 
 param_grid <- expand.grid(
   n = n,
@@ -58,7 +65,7 @@ output <- purrr::pmap(
   }
 )
 
-names(output) <- paste0(
-  "n", param_grid$n,
-  "_", param_grid$nuisance
-)
+# names(output) <- paste0(
+#   "n", param_grid$n,
+#   "_", param_grid$nuisance
+# )

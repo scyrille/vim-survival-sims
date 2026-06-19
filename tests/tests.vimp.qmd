@@ -48,6 +48,9 @@ sample_split <- TRUE
 vims <- c("AUC","brier")
 R <- 100
 # R <- 1000
+# Calibration parameters 
+calibration_param <- readRDS(here::here("outputs","results",
+                                        "mc_calibration_param.rds"))
 ```
 
 # Scenario 1: Additive hazards 
@@ -78,10 +81,10 @@ approximately 20%, and the calibrated value was then fixed across all
 simulation replicates. 
 
 ```{r}
+c_max <- calibration_param$params_1$c_max
 data_scen1 <- generate_data(n        = n, 
                             scenario = "1",
-                            seed     = seed
-)
+                            c_max    = c_max)
 head(data_scen1)
 
 # Check prevalences
@@ -202,10 +205,7 @@ time <- data_scen1$time
 event <- data_scen1$event
 X <- data_scen1 %>% dplyr::select(starts_with("X")) 
 surv_aalen_fit <- survival::survfit(survival::Surv(time, event)~1)
-landmark_times <- quantile(surv_aalen_fit, 
-                           probs = c(#0.25, 
-                                     0.75))$quantile
-landmark_times
+landmark_times <- calibration_param$params_1$tau
 approx_times <- sort(unique(c(0, time[event == 1], landmark_times)))
 approx_times <- approx_times[approx_times <= max(landmark_times)]
 length(approx_times)

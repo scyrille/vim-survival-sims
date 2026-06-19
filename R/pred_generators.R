@@ -9,8 +9,13 @@ generate_full_predictions <- function(time,
   
   if (nuisance == "stackG"){
     
-    SL.library <- c("SL.mean", "SL.gam","SL.ranger")
-    bin_size <- 0.5
+    xgboost_grid <- SuperLearner::create.SL.xgboost(
+      tune = list(ntrees        = c(250,500,1000),
+                  max_depth     = c(1,2),
+                  minobspernode = 10,
+                  shrinkage     = 0.01))
+    SL.library <- c("SL.mean", "SL.gam","SL.ranger", xgboost_grid$names)
+    bin_size <- 0.05
     surv_out <- survML::stackG(time = time,
                                event = event,
                                X = X,
@@ -158,13 +163,16 @@ generate_full_predictions <- function(time,
 }
 
 
-
-
 generate_reduced_predictions <- function(f_hat,
                                          X_reduced,
                                          X_reduced_holdout){
 
-  SL.library <- c("SL.mean", "SL.gam","SL.ranger")
+  xgboost_grid <- SuperLearner::create.SL.xgboost(
+    tune = list(ntrees        = c(250,500,1000),
+                max_depth     = c(1,2),
+                minobspernode = 10,
+                shrinkage     = 0.01))
+  SL.library <- c("SL.mean", "SL.gam","SL.ranger", xgboost_grid$names)
   long_dat <- data.frame(f_hat = f_hat, X_reduced)
   long_new_dat <- data.frame(X_reduced_holdout)
   reduced_fit <- SuperLearner::SuperLearner(Y = long_dat$f_hat,
@@ -245,6 +253,7 @@ CV_generate_reduced_predictions_landmark <- function(time,
         X_reduced_holdout = X_reduced_holdout
       )
       
+      reduced_preds
       tibble::tibble(!!paste0("t", landmark_times[k]) := reduced_preds$fs_hat)
       
     }) %>% as.matrix()

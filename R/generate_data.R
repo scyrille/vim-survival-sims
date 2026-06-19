@@ -3,12 +3,13 @@ get_scenario_param <- function(scenario){
   
   if (scenario == "1"){
     
-    p           = 4
+    p           = 5
     lambda0     = 0.05 
-    alpha       = c(0.1,    # strong
-                    0.05,   # moderate
-                    0.005,  # weak
-                    0)      # null, 
+    alpha       = c(0.3,    
+                    0.15,    
+                    0.05,   
+                    0.005,  
+                    0)      
     sigma       = diag(x = 1, nrow = p, ncol = p)
     prev        = rep(0.4, p)
     target_cens = 0.2
@@ -27,9 +28,10 @@ get_scenario_param <- function(scenario){
     p <- 6
     prev_add <- c(0.4, 0.4, 0.4)
     sigma_add <- diag(x = 1, nrow = 3, ncol = 3)
-    alpha <- c(0.1,  # strong
-               0.05, # intermediate
-               0)    # null
+    lambda0 <- 0.05
+    alpha <- c(0.3, # strong
+               0.1, # intermediate
+               0)   # null
     prev_mult <- c(0.4, 0.4)
     sigma_mult_bin <- diag(x = 1, nrow = 2, ncol = 2)
     mean_mult <- 0
@@ -37,7 +39,6 @@ get_scenario_param <- function(scenario){
     beta <- c(1,   # strong
               0.5, # intermediate
               0)   # null
-    lambda0 <- 0.05
     target_cens <- 0.2
     
     params = list(p               = p,

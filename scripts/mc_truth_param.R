@@ -3,8 +3,11 @@
 #  True VIM values  #
 #-------------------#
 
-library(tidyverse)
 library(here)
+library(tidyverse)
+library(MASS)
+library(cvAUC)
+library(vimp)
 
 source(here::here("R", "generate_data.R"))
 source(here::here("R", "mc_truth_helpers.R"))

@@ -36,7 +36,7 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
     time = time,
     event = event,
     X = X,
-    landmark_times = tau,
+    tau = tau,
     approx_times = approx_times,
     nuisance = nuisance,
     cf_folds = cf_folds)
@@ -45,8 +45,6 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
   CV_full_preds_train <- V0_preds$CV_full_preds_train
   CV_S_preds <- V0_preds$CV_S_preds
   CV_G_preds <- V0_preds$CV_G_preds
-  
-  shared_settings <- expand.grid(indx = indxs, vim = vims) 
   
   output <- purrr::map_dfr(indxs, function(indx_i) {
     char_indx <- as.character(indx_i)
@@ -57,7 +55,7 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
       time = time,
       event = event,
       X = X,
-      landmark_times = tau,
+      tau = tau,
       cf_folds = cf_folds,
       indx = indx,
       full_preds_train = CV_full_preds_train

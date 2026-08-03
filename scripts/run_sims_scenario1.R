@@ -9,6 +9,8 @@ library(xgboost)
 library(timereg)
 library(survivalSL)
 
+fs::dir_create(here::here("outputs", "results", "scenario1"))
+
 source(here::here("R", "generate_data.R"))
 source(here::here("R", "pred_generators.R"))
 source(here::here("R", "do_one.R"))
@@ -16,32 +18,32 @@ source(here::here("R", "do_one.R"))
 # Calibration parameters 
 calibration_param <- readRDS(here::here("outputs","results",
                                         "mc_calibration_param.rds"))
-
-# Number of Monte Carlo replications 
-# R <- 500
-R <- 2
-
-# Sample size 
-# n <- c(500,1000,1500)
-n <- 100
-
-fs::dir_create(here::here("outputs", "results", "scenario1"))
-
 c_max <- calibration_param$params_1$c_max
 tau <- calibration_param$params_1$tau
 
-nuisances <- c("stackG", "aalen")
+# Number of Monte Carlo replications 
+R <- 500
+
+# Sample size 
+n <- c(500,1000)
+
+nuisances <- c("aalen","stackG","survivalSL")
 
 param_grid <- expand.grid(
   n = n,
-  nuisance = nuisances
+  nuisance = nuisances,
+  stringsAsFactors = FALSE
 )
 
-seeds <- sample.int(1e9, nrow(param_grid))
+param_grid$seed <- sample.int(1e9, nrow(param_grid))
 
-output <- purrr::pmap(
+purrr::pmap(
+  
   param_grid,
-  function(n, nuisance) {
+  
+  function(n, nuisance, seed) {
+    
+    set.seed(seed)
     
     res <- replicate(
       R,
@@ -60,12 +62,5 @@ output <- purrr::pmap(
       here::here("outputs","results","scenario1",
                  paste0("sims_n", n, "_", nuisance,".rds"))
     )
-    
-    res
   }
 )
-
-# names(output) <- paste0(
-#   "n", param_grid$n,
-#   "_", param_grid$nuisance
-# )

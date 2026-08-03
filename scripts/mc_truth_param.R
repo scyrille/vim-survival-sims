@@ -67,27 +67,27 @@ true_param_1 <- purrr::map_dfr(calibration_param$params_1$tau, function(t) {
   dplyr::bind_rows(
     reduced_res %>%
       dplyr::transmute(
-        vim      = "BS(t)",
-        tau      = t,
+        vim            = "BS(t)",
+        tau            = t,
         variable,
-        V_full   = V_full_brier,
-        V_reduced = V_brier,
-        vim_value = V_full_brier - V_brier
+        true_V_full    = V_full_brier,
+        true_V_reduced = V_brier,
+        true_vim       = V_full_brier - V_brier
       ),
     reduced_res %>%
       dplyr::transmute(
-        vim      = "AUC(t)",
-        tau      = t,
+        vim            = "AUC(t)",
+        tau            = t,
         variable,
-        V_full   = V_full_auc,
-        V_reduced = V_auc,
-        vim_value = pmax(V_full_auc - V_auc, 0)
+        true_V_full    = V_full_auc,
+        true_V_reduced = V_auc,
+        true_vim       = pmax(V_full_auc - V_auc, 0)
       )
   )
 }) %>%
   dplyr::mutate(n_mc = n,
-                scenario_id = "1")%>%
-  relocate(scenario_id)%>%
+                scenario = "1")%>%
+  relocate(scenario)%>%
   arrange(variable, tau)
 
 
@@ -159,30 +159,30 @@ true_param_2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
   dplyr::bind_rows(
     reduced_res %>%
       dplyr::transmute(
-        vim       = "BS(t)",
-        tau       = t,
+        vim            = "BS(t)",
+        tau            = t,
         variable,
-        V_full    = V_full_brier,
-        V_reduced = V_brier,
-        vim_value = pmax(V_full_brier - V_brier, 0)
+        true_V_full    = V_full_brier,
+        true_V_reduced = V_brier,
+        true_vim       = pmax(V_full_brier - V_brier, 0)
       ),
     
     reduced_res %>%
       dplyr::transmute(
-        vim       = "AUC(t)",
-        tau       = t,
+        vim            = "AUC(t)",
+        tau            = t,
         variable,
-        V_full    = V_full_auc,
-        V_reduced = V_auc,
-        vim_value = pmax(V_full_auc - V_auc, 0)
+        true_V_full    = V_full_auc,
+        true_V_reduced = V_auc,
+        true_vim       = pmax(V_full_auc - V_auc, 0)
       )
   )
 }) %>%
   dplyr::mutate(
     n_mc = n,
-    scenario_id = "2"
+    scenario = "2"
   ) %>%
-  dplyr::relocate(scenario_id) %>%
+  dplyr::relocate(scenario) %>%
   dplyr::arrange(variable, tau)
 
 

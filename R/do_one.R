@@ -3,7 +3,7 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
   
   start <- Sys.time()
   
-  vims <- c("AUC","brier")
+  vims <- c("BS(t)","AUC(t)")
   
   if (scenario == 1){
     
@@ -64,7 +64,7 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
     purrr::map_dfr(vims, function(vim) {
       output <- switch(
         vim,
-        brier = survML::vim_brier(
+        `BS(t)` = survML::vim_brier(
           time = time,
           event = event,
           approx_times = approx_times,
@@ -78,7 +78,7 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
           ss_folds = ss_folds#,
           # scale_est = TRUE
         ), 
-        AUC = survML::vim_AUC(
+        `AUC(t)` = survML::vim_AUC(
           time = time,
           event = event,
           approx_times = approx_times,
@@ -104,11 +104,10 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
   
   end <- Sys.time()
   runtime <- as.numeric(difftime(end, start, units = "mins"))
-  output <- output %>%
+  output %>%
+    dplyr::rename(., tau = landmark_time)%>%
     dplyr::mutate(scenario = scenario, 
                   runtime = runtime, 
                   n = n, 
-                  nuisance = nuisance)%>%
-    dplyr::relocate(vim, variable)
-  return(output)
+                  nuisance = nuisance) 
 }

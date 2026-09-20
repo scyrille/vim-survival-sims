@@ -1,9 +1,11 @@
 
-do_one <- function(n, scenario, c_max, tau, nuisance){
+do_one <- function(n, scenario, c_max, tau, nuisances, scale_est = FALSE){
   
   start <- Sys.time()
   
   vims <- c("BS(t)","AUC(t)")
+  
+  message("Generating data...")
   
   if (scenario == 1){
     
@@ -32,82 +34,24 @@ do_one <- function(n, scenario, c_max, tau, nuisance){
   cf_folds <- folds$cf_folds
   ss_folds <- folds$ss_folds
   
-  V0_preds <- CV_generate_full_predictions_landmark(
-    time = time,
-    event = event,
-    X = X,
-    tau = tau,
-    approx_times = approx_times,
-    nuisance = nuisance,
-    cf_folds = cf_folds)
-  
-  CV_full_preds <- V0_preds$CV_full_preds
-  CV_full_preds_train <- V0_preds$CV_full_preds_train
-  CV_S_preds <- V0_preds$CV_S_preds
-  CV_G_preds <- V0_preds$CV_G_preds
-  
-  output <- purrr::map_dfr(indxs, function(indx_i) {
-    char_indx <- as.character(indx_i)
-    indx <- as.numeric(strsplit(char_indx, split = ",")[[1]])
-    variable <- names(X)[indx]
-    
-    CV_reduced_preds <- CV_generate_reduced_predictions_landmark(
-      time = time,
-      event = event,
-      X = X,
-      tau = tau,
-      cf_folds = cf_folds,
-      indx = indx,
-      full_preds_train = CV_full_preds_train
-    )
-    
-    purrr::map_dfr(vims, function(vim) {
-      output <- switch(
-        vim,
-        `BS(t)` = survML::vim_brier(
-          time = time,
-          event = event,
-          approx_times = approx_times,
-          landmark_times = tau,
-          f_hat = CV_full_preds,
-          fs_hat = CV_reduced_preds,
-          S_hat = CV_S_preds,
-          G_hat = CV_G_preds,
-          cf_folds = cf_folds,
-          sample_split = sample_split,
-          ss_folds = ss_folds#,
-          # scale_est = TRUE
-        ), 
-        `AUC(t)` = survML::vim_AUC(
-          time = time,
-          event = event,
-          approx_times = approx_times,
-          landmark_times = tau,
-          f_hat = purrr::map(CV_full_preds, ~ 1 - .x),
-          fs_hat = purrr::map(CV_reduced_preds, ~ 1 - .x),
-          S_hat = CV_S_preds,
-          G_hat = CV_G_preds,
-          cf_folds = cf_folds,
-          sample_split = sample_split,
-          ss_folds = ss_folds#,
-          # scale_est = TRUE
-        )
+  output <- nuisances %>%
+    purrr::map(
+      ~compute_vim(
+        time = time, 
+        event = event, 
+        X = X, 
+        indxs = indxs, 
+        tau = tau, 
+        approx_times = approx_times, 
+        cf_folds = cf_folds, 
+        ss_folds = ss_folds, 
+        nuisance = .x, 
+        scale_est = scale_est
       )
-      output %>%
-        dplyr::mutate(
-          vim = vim,
-          variable = variable
-        )
-    })
-      
-  })
-  
-  end <- Sys.time()
-  runtime <- as.numeric(difftime(end, start, units = "mins"))
-  output %>%
-    dplyr::rename(., tau = landmark_time)%>%
+    )%>% 
+    bind_rows() %>%
     dplyr::mutate(scenario = scenario, 
-                  runtime = runtime, 
-                  n = n, 
-                  nuisance = nuisance) 
+                  n = n)
+  
+  output 
 }

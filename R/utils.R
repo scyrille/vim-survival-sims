@@ -11,6 +11,7 @@
 library(tidyverse)
 library(survival)      
 library(survminer) 
+library(flextable)
 
 #' Pairwise Fisher's exact tests 
 #'
@@ -172,4 +173,149 @@ plot_surv <- function(formula,
   }
   names(plot) <- gsub("::", "_", names(fit))
   plot
+}
+
+# Pour intégrer les formules aux flextables 
+mixed_paragraph <- function(x) {
+  
+  # Repérage des expressions $...$
+  positions <- stringr::str_locate_all(x, "\\$[^$]+\\$")[[1]]
+  
+  # Aucun code LaTeX dans la cellule
+  if (nrow(positions) == 0L) {
+    return(
+      flextable::as_paragraph(
+        flextable::as_chunk(x)
+      )
+    )
+  }
+  
+  chunks <- list()
+  start_text <- 1L
+  
+  for (k in seq_len(nrow(positions))) {
+    
+    eq_start <- positions[k, "start"]
+    eq_end   <- positions[k, "end"]
+    
+    # Texte situé avant l’équation
+    if (eq_start > start_text) {
+      chunks[[length(chunks) + 1L]] <-
+        flextable::as_chunk(
+          substr(x, start_text, eq_start - 1L)
+        )
+    }
+    
+    # Équation sans les délimiteurs $
+    equation <- substr(x, eq_start + 1L, eq_end - 1L)
+    
+    chunks[[length(chunks) + 1L]] <-
+      flextable::as_equation(
+        equation,
+        width = 0.8,
+        height = 0.22
+      )
+    
+    start_text <- eq_end + 1L
+  }
+  
+  # Texte situé après la dernière équation
+  if (start_text <= nchar(x)) {
+    chunks[[length(chunks) + 1L]] <-
+      flextable::as_chunk(
+        substr(x, start_text, nchar(x))
+      )
+  }
+  
+  do.call(flextable::as_paragraph, chunks)
+}
+
+
+tbl_vim <- function(output){
+  
+  full_model <- output %>%
+    distinct(vim, large_predictiveness) %>%
+    transmute(
+      model = "Full model",
+      vim,
+      performance = large_predictiveness,
+      importance = NA_real_,
+      model_order = 0L
+    )
+  
+  reduced_models <- output %>%
+    transmute(
+      model = paste0(
+        "Without $X_{",
+        stringr::str_remove(variable, "^X"),
+        "}$"
+      ),
+      vim,
+      performance = small_predictiveness,
+      importance = est,
+      model_order = readr::parse_number(variable)
+    )
+  
+  tab <- bind_rows(full_model, reduced_models) %>%
+    mutate(
+      vim = recode(
+        vim,
+        "BS(t)"  = "BS",
+        "AUC(t)" = "AUC"
+      )
+    ) %>%
+    pivot_wider(
+      id_cols = c(model, model_order),
+      names_from = vim,
+      values_from = c(performance, importance),
+      names_glue = "{.value}_{vim}"
+    ) %>%
+    # arrange(model_order) %>%
+    dplyr::select(
+      model,
+      performance_BS,
+      importance_BS,
+      performance_AUC,
+      importance_AUC
+    )%>%
+    dplyr::mutate(
+      across(2:5, ~ifelse(!is.na(.x), 
+                          format(round(.x, 3), nsmall = 3), 
+                          "—"))
+    )%>%
+    purrr::set_names(nm = c("Model",
+                            "$\\widehat V_n^{\\mathrm{BS}}(\\tau)$",
+                            "$\\widehat \\psi_{n,j}^{\\mathrm{BS}}(\\tau)$",
+                            "$\\widehat V_n^{\\mathrm{AUC}}(\\tau)$",
+                            "$\\widehat \\psi_{n,j}^{\\mathrm{AUC}}(\\tau)$"))
+  
+  ft_tab <- flextable::flextable(tab)
+  
+  for (i in seq_len(nrow(tab))) {
+    ft_tab <- ft_tab %>%
+      flextable::compose(
+        i = i,
+        j = "Model",
+        value = mixed_paragraph(tab$Model[i]),
+        part = "body"
+      )
+  }
+  
+  for (j in 2:ncol(tab)){
+    ft_tab <- ft_tab %>%
+      flextable::compose(
+        j = j, 
+        value = mixed_paragraph(names(tab)[j]),
+        part = "header"
+      )
+  }
+  
+  notes <- "$\\widehat V_n^{\\mathrm{BS}}(\\tau)$: denotes the population-level predictive performance at horizon $\\tau$, defined as the negative Brier score; $\\widehat \\psi_{n,j}^{\\mathrm{BS}}(\\tau)$: denotes the loss in Brier-score-based predictive performance resulting from the exclusion of $X_j$; $\\widehat V_n^{\\mathrm{AUC}}(\\tau)$: denotes the population-level cumulative/dynamic AUC at horizon $\\tau$; $\\widehat \\psi_{n,j}^{\\mathrm{AUC}}(\\tau)$: denotes the loss in cumulative/dynamic AUC resulting from the exclusion of $X_j$."
+  
+  ft_tab %>%
+    flextable::add_footer_lines(notes)%>%
+    flextable::compose(
+      value = mixed_paragraph(notes),
+      part = "footer"
+    )
 }

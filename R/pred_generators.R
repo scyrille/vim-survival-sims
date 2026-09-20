@@ -7,18 +7,25 @@ generate_full_predictions <- function(time,
                                       approx_times,
                                       nuisance){
   
-  x_vars <- colnames(X)
+  x_vars <- names(X)
   dat <- data.frame(time = time, event = event, X)
+  
+  stopifnot(
+    is.numeric(time),
+    all(event %in% c(0L, 1L)),
+    nrow(X) == length(time),
+    nrow(X) == length(event)
+  )
   
   if (nuisance == "stackG"){
     
     # Event model: S(t|X) and censoring model: G(t|X) 
-    xgboost_grid <- SuperLearner::create.SL.xgboost(
-      tune = list(ntrees        = c(250,500,1000),
-                  max_depth     = c(1,2),
-                  minobspernode = 10,
-                  shrinkage     = 0.01))
-    SL.library <- c("SL.mean", "SL.gam","SL.ranger", xgboost_grid$names)
+    # xgboost_grid <- SuperLearner::create.SL.xgboost(
+    #   tune = list(ntrees        = c(250,500,1000),
+    #               max_depth     = c(1,2),
+    #               minobspernode = 10,
+    #               shrinkage     = 0.01))
+    SL.library <- c("SL.mean", "SL.glm", "SL.gam","SL.ranger","SL.xgboost")
     bin_size <- 0.05
     surv_out <- survML::stackG(time = time,
                                event = event,
@@ -93,12 +100,10 @@ generate_full_predictions <- function(time,
   else if (nuisance == "survivalSL"){
     
     methods <- c("LIB_COXall", 
-                 # "LIB_COXen",
-                 "LIB_PHexponential", 
+                 "LIB_COXridge",
+                 "LIB_PHexponential",
                  "LIB_AFTgamma",
-                 "LIB_RSF"#,
-                 # "LIB_PLANN"
-                 ) 
+                 "LIB_RSF") 
     
     # Event model: S(t | X)
     formS <- as.formula(
@@ -106,48 +111,50 @@ generate_full_predictions <- function(time,
     )
     
     S_fit <- survivalSL::survivalSL(
-      formula = formS,
-      data    = dat,
-      metric  = "auc",
-      methods = methods,
-      cv      = 5
+      formula       = formS,
+      data          = dat,
+      metric        = "auc",
+      methods       = methods,
+      cv            = 5,
+      show_progress = FALSE
     )
     
     # Censoring model: G(t | X)
     formG <- as.formula(
-      paste("Surv(time, 1-event) ~", paste(x_vars, collapse = " + "))
+      paste("Surv(time, 1 - event) ~", paste(x_vars, collapse = " + "))
     )
     
     G_fit <- survivalSL::survivalSL(
-      formula = formG,
-      data    = dat,
-      metric  = "auc",
-      methods = methods,
-      cv      = 5
+      formula       = formG,
+      data          = dat,
+      metric        = "auc",
+      methods       = methods,
+      cv            = 5,
+      show_progress = FALSE
     )
     
     # Predictions
-    S_hat <- survivalSL::predict.sltime(
+    S_hat <- survivalSL:::predict.sltime(
       S_fit,
-      newdata  = data.frame(X_holdout),
+      newdata  = X_holdout,
       newtimes = approx_times
     )$predictions$sl
     
-    G_hat <- survivalSL::predict.sltime(
+    G_hat <- survivalSL:::predict.sltime(
       G_fit,
-      newdata  = data.frame(X_holdout),
+      newdata  = X_holdout,
       newtimes = approx_times
     )$predictions$sl
     
-    S_hat_train <- survivalSL::predict.sltime(
+    S_hat_train <- survivalSL:::predict.sltime(
       S_fit,
-      newdata  = data.frame(X),
+      newdata  = X,
       newtimes = approx_times
     )$predictions$sl
     
-    G_hat_train <- survivalSL::predict.sltime(
+    G_hat_train <- survivalSL:::predict.sltime(
       G_fit,
-      newdata  = data.frame(X),
+      newdata  = X,
       newtimes = approx_times
     )$predictions$sl
   
@@ -169,12 +176,12 @@ generate_reduced_predictions <- function(f_hat,
                                          X_reduced,
                                          X_reduced_holdout){
 
-  xgboost_grid <- SuperLearner::create.SL.xgboost(
-    tune = list(ntrees        = c(250,500,1000),
-                max_depth     = c(1,2),
-                minobspernode = 10,
-                shrinkage     = 0.01))
-  SL.library <- c("SL.mean", "SL.gam","SL.ranger", xgboost_grid$names)
+  # xgboost_grid <- SuperLearner::create.SL.xgboost(
+  #   tune = list(ntrees        = c(250,500,1000),
+  #               max_depth     = c(1,2),
+  #               minobspernode = 10,
+  #               shrinkage     = 0.01))
+  SL.library <- c("SL.mean", "SL.glm", "SL.gam","SL.ranger","SL.xgboost")
   long_dat <- data.frame(f_hat = f_hat, X_reduced)
   long_new_dat <- data.frame(X_reduced_holdout)
   reduced_fit <- SuperLearner::SuperLearner(Y = long_dat$f_hat,
@@ -197,6 +204,9 @@ CV_generate_full_predictions_landmark <- function(time,
                                                   approx_times,
                                                   nuisance,
                                                   cf_folds) {
+  
+  X <- as.data.frame(X)
+  event <- as.integer(event)
   
   V <- length(unique(cf_folds))
   

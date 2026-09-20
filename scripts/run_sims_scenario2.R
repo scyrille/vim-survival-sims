@@ -27,11 +27,10 @@ R <- 500
 # Sample size 
 n <- c(500,1000)
 
-nuisances <- c("stackG", "cox.aalen","survivalSL")
+nuisances <- c("cox.aalen", "stackG", "survivalSL")
 
 param_grid <- expand.grid(
   n = n,
-  nuisance = nuisances,
   stringsAsFactors = FALSE
 )
 
@@ -41,7 +40,7 @@ purrr::pmap(
   
   param_grid,
   
-  function(n, nuisance, seed) {
+  function(n, seed) {
     
     set.seed(seed)
     
@@ -52,7 +51,7 @@ purrr::pmap(
         scenario = "2",
         c_max = c_max,
         tau = tau,
-        nuisance = nuisance
+        nuisance = nuisances
       ),
       simplify = FALSE
     )
@@ -60,7 +59,7 @@ purrr::pmap(
     saveRDS(
       res,
       here::here("outputs","results","scenario2",
-                 paste0("sims_n", n, "_", nuisance,".rds"))
+                 paste0("sims_n", n, ".rds"))
     )
   }
 )

@@ -33,22 +33,3 @@ true_S0_cox_aalen <- function(t, data, lambda0,
   
   exp(-t * haz)
 }
-
-# # Cumulative distribution function (CDF) : F(x)=P(X ≤ x)
-# true_f0_aalen <- function(t, data, lambda0, alpha) {
-#   
-#   1 - true_S0_aalen(t, data, lambda0, alpha)
-#   
-# }
-# 
-# true_f0_cox_aalen <- function(t, data, lambda0, alpha, beta,
-#                               add_vars, mult_vars) {
-#   
-#   1 - true_S0_cox_aalen(t, data, lambda0, alpha, beta, add_vars, mult_vars)
-#   
-# }
-# 
-# # Independent uniform censoring
-# true_G0_uniform <- function(t, data, c_max) {
-#   rep(pmax(1 - t / c_max, 0), nrow(data))
-# }

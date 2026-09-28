@@ -18,7 +18,7 @@ compute_vim <- function(time,
                  nuisance, 
                  "..."))
   
-  V0_preds <- CV_generate_full_predictions_landmark(
+  V0_preds <- CV_generate_full_predictions(
     time = time,
     event = event,
     X = X,
@@ -34,9 +34,12 @@ compute_vim <- function(time,
   CV_G_preds <- V0_preds$CV_G_preds
 
   output <- purrr::map_dfr(indxs, function(indx_i) {
-    char_indx <- as.character(indx_i)
-    indx <- as.numeric(strsplit(char_indx, split = ",")[[1]])
-    variable <- names(X)[indx]
+    
+    indx <- indx <- as.integer(trimws(
+      strsplit(paste(indx_i, collapse = ","), ",", fixed = TRUE)[[1]]
+    ))
+    
+    variable <- paste(names(X)[indx], collapse = ", ")
     
     message(paste0("Estimating the importance of ",
                    variable,
@@ -44,7 +47,7 @@ compute_vim <- function(time,
                    nuisance, 
                    "..."))
     
-    CV_reduced_preds <- CV_generate_reduced_predictions_landmark(
+    CV_reduced_preds <- CV_generate_reduced_predictions(
       time = time,
       event = event,
       X = X,
@@ -62,8 +65,8 @@ compute_vim <- function(time,
           event = event,
           approx_times = approx_times,
           landmark_times = tau,
-          f_hat = CV_full_preds,
-          fs_hat = CV_reduced_preds,
+          f_hat = purrr::map(CV_full_preds, ~ 1 - .x),
+          fs_hat = purrr::map(CV_reduced_preds, ~ 1 - .x),
           S_hat = CV_S_preds,
           G_hat = CV_G_preds,
           sample_split = TRUE,

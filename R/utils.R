@@ -230,6 +230,156 @@ mixed_paragraph <- function(x) {
   do.call(flextable::as_paragraph, chunks)
 }
 
+tbl_data <- function(output, scenario){
+  
+  true_cens_rate <- 0.2
+  
+  if (scenario == 1) {
+    
+    true_prev = 0.4
+    
+    perf <- output %>%
+      dplyr::mutate(
+        across(starts_with("prev"), ~.x - true_prev),
+        cens_rate = cens_rate - true_cens_rate,
+        across(starts_with("pval"),
+               ~ifelse(.x < 0.05, 1, 0))
+      )
+    
+  } else if (scenario == 2) {
+    
+    true_prev = 0.4
+    true_mean_Z3 = 0
+    true_sd_Z3 = 1
+    true_coef_Z1 = 1
+    true_coef_Z2 = 0.5 
+    true_coef_Z3 = 0
+    
+    perf <- output %>%
+      dplyr::mutate(
+        across(starts_with("prev") & !matches("Z3"), ~.x - true_prev),
+        mean_Z3 = mean_Z3 - true_mean_Z3,
+        sd_Z3 = sd_Z3 - true_sd_Z3,
+        coef_Z1 = coef_Z1 - true_coef_Z1, 
+        coef_Z2 = coef_Z2 - true_coef_Z2, 
+        coef_Z3 = coef_Z3 - true_coef_Z3, 
+        cens_rate = cens_rate - true_cens_rate,
+        across(starts_with("pval"),
+               ~ifelse(.x < 0.05, 1, 0))
+      )
+    
+  }
+  
+  perf <- perf %>%
+    pivot_longer(cols = everything())%>%
+    arrange(name)%>%
+    group_by(name)%>%
+    dplyr::mutate(
+      across(everything(),~mean(.x), .names = "{col}2"),
+      variable =  stringr::str_extract(name, "[XZ][1-5]") %>%
+        stringr::str_replace("([XZ])([1-5])", "$\\1_\\2$"), 
+      name = gsub(paste(c(paste0("_X",1:5),
+                          paste0("_Z",1:5)), collapse="|"), "", name),
+      name = case_when(
+        name == "prev" ~"Bias in prevalence",
+        name == "mean" ~"Bias in mean", 
+        name == "sd" ~ "Bias in standard deviation", 
+        name == "coef" ~"Bias in coefficient", 
+        name == "pval_KS" ~"Empirical power of the Kolmogorov-Smirnov test ($H_0: \\text{constant effect}$)",
+        name == "pval_supremum" ~ "Empirical power of the supremum test ($H_0: B(t)=0$)",
+        name == "pval_prop" ~ "Empirical type I error of the proportionality test", 
+        name == "cens_rate" ~ "Bias in the censoring proportion",
+        TRUE ~ name),
+      value2 = round(value2, 4)
+    )%>%
+    ungroup()
+  
+  n_add <- perf %>% 
+    dplyr::filter(grepl("X", variable))%>%
+    dplyr::distinct(variable)%>%
+    nrow()
+  
+  ft_tbl_prev <- perf %>%
+    dplyr::filter(name == "Bias in prevalence")%>%
+    distinct(value2)%>%
+    flextable()%>%
+    flextable::delete_part()
+    
+  tbl_add_var <- perf %>%
+    dplyr::filter(grepl("X", variable))%>%
+    dplyr::distinct(name, value2, variable)%>%
+    tidyr::pivot_wider(names_from = variable, 
+                       values_from = value2)%>%
+    dplyr::rename(., ` `= name)
+  
+  ft_tbl_add_var <- flextable(tbl_add_var)
+  
+  for (i in seq_len(nrow(tbl_add_var))) {
+    ft_tbl_add_var <- ft_tbl_add_var %>%
+      flextable::compose(
+        i = i,
+        j = " ",
+        value = mixed_paragraph(tbl_add_var$` `[i]),
+        part = "body"
+      )
+  }
+  
+  for (j in 2:ncol(tbl_add_var)){
+    ft_tbl_add_var <- ft_tbl_add_var %>%
+      flextable::compose(
+        j = j, 
+        value = mixed_paragraph(names(tbl_add_var)[j]),
+        part = "header"
+      )
+  }
+  
+ 
+  ft_tbl_add_var <- ft_tbl_add_var %>%
+    flextable::add_footer_lines(values = as_paragraph(
+      paste0("Bias in the censoring proportion: ", perf %>%
+               dplyr::filter(name == "Bias in the censoring proportion")%>%
+               distinct(value2)%>%
+               round(digits = 4))
+      )
+    )
+  
+  if (scenario == 1){
+    
+    ft_tbl_add_var
+    
+  } else if (scenario == 2){
+    
+    n_prop <- perf %>% 
+      dplyr::filter(grepl("Z", variable))%>%
+      dplyr::distinct(variable)%>%
+      nrow()
+    
+    tbl_prop_var <- perf %>%
+      dplyr::filter(grepl("Z", variable))%>%
+      dplyr::distinct(name, value2, variable)%>%
+      tidyr::pivot_wider(names_from = variable, 
+                         values_from = value2)%>%
+      dplyr::rename(., ` `= name)
+    
+    ft_tbl_prop_var <- flextable(tbl_prop_var)
+    
+    for (j in 2:ncol(tbl_prop_var)){
+      ft_tbl_prop_var <- ft_tbl_prop_var %>%
+        flextable::compose(
+          j = j, 
+          value = mixed_paragraph(names(tbl_prop_var)[j]),
+          part = "header"
+        )
+    }
+      
+    list(tbl_add = ft_tbl_add_var %>%
+           flextable::width(width = c(3, rep(0.7, n_add))),
+         tbl_prop = ft_tbl_prop_var %>%
+           flextable::width(width = c(3, rep(0.7, n_prop)))
+    )
+  }
+}
+
 
 tbl_vim <- function(output){
   
@@ -317,5 +467,6 @@ tbl_vim <- function(output){
     flextable::compose(
       value = mixed_paragraph(notes),
       part = "footer"
-    )
+    )%>%
+    flextable::width(width = c(2, rep(1.1, 4)))
 }

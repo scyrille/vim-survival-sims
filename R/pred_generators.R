@@ -1,174 +1,175 @@
-
-generate_full_predictions <- function(time,
-                                      event,
-                                      X,
+generate_full_predictions <- function(time, 
+                                      event, 
+                                      X, 
                                       X_holdout, 
-                                      tau,
+                                      tau, 
                                       approx_times,
-                                      nuisance){
+                                      nuisance) {
   
-  x_vars <- names(X)
-  dat <- data.frame(time = time, event = event, X)
   
+  event <- as.integer(event)
+  X <- as.data.frame(X)
+  X_holdout <- as.data.frame(X_holdout)
+  X_holdout <- X_holdout[, names(X), drop = FALSE]
+  newX <- rbind(X_holdout, X)
+  dat <- data.frame(time = time, event = event, X,
+                    check.names = FALSE)
+  datS <- dat
+  datG <- dat %>%
+    dplyr::mutate(event = 1L - event)
+  
+  if (nuisance == "stackG") {
+    
+    SL.library <- c(
+      "SL.mean", 
+      "SL.glm", 
+      "SL.gam",
+      "SL.ranger",
+      "SL.xgboost"
+    )
+    
+    fit <- survML::stackG(
+      time = time, 
+      event = event, 
+      X = X, 
+      newX = newX,
+      newtimes = approx_times,
+      time_grid_approx = approx_times,
+      bin_size = 0.05,
+      time_basis = "continuous",
+      surv_form = "PI",
+      SL_control = list(SL.library = SL.library, 
+                        V = 5)
+    )
+    
+    S_all <- fit$S_T_preds
+    G_all <- fit$S_C_preds
+    
+  } else {
+    
+    if (nuisance == "aalen") {
+      
+      S_fit <- timereg::aalen(
+        survival::Surv(time, event) ~ ., data = datS
+      )
+      G_fit <- timereg::aalen(
+        survival::Surv(time, event) ~ ., data = datG
+      )
+      
+    } else if (nuisance == "cox.aalen") {
+      
+      prop_vars <- x_vars[grepl("Z",x_vars)]
+      add_vars  <- x_vars[grepl("X",x_vars)]
+      
+      rhs <- c(
+        if (length(prop_vars) > 0) paste0("prop(", prop_vars, ")"),
+        add_vars
+      )
+      
+      form <- stats::as.formula(
+        paste("survival::Surv(time, event) ~",
+              paste(rhs, collapse = " + ")),
+        env = environment()
+      )
+      
+      # Event model: S(t | X)
+      S_fit <- timereg::cox.aalen(form, data = datG)
+      
+      # Censoring model: G(t | X)
+      G_fit <- timereg::cox.aalen(form, data = datG)
+      
+    } else if (nuisance == "survivalSL") {  
+      
+      methods <- c(
+        "LIB_COXall", 
+        "LIB_COXridge", 
+        "LIB_PHexponential",
+        "LIB_AFTgamma", 
+        "LIB_RSF"
+      )
+      
+      # Event model: S(t | X)
+      S_fit <- survivalSL::survivalSL(
+        formula       = survival::Surv(time, event)~.,
+        data          = datS,
+        metric        = "auc",
+        methods       = methods,
+        cv            = 5,
+        show_progress = FALSE
+      )
+      
+      # Censoring model: G(t | X)
+      G_fit <- survivalSL::survivalSL(
+        formula       = survival::Surv(time, event)~.,
+        data          = datG,
+        metric        = "auc",
+        methods       = methods,
+        cv            = 5,
+        show_progress = FALSE
+      )
+      
+    }
+    
+    if (nuisance == "survivalSL") {
+      
+      predict_sl <- function(fit) {
+        
+        times_pos <- sort(unique(approx_times[approx_times > 0]))
+        out <- matrix(1, nrow = nrow(newX), ncol = length(approx_times))
+        
+        if (length(times_pos) > 0L) {
+          pred <- stats::predict(
+            fit,
+            newdata = as.data.frame(newX),
+            newtimes = times_pos
+          )
+          mat <- pred$predictions[["sl"]]
+          cols <- match(approx_times[approx_times > 0], pred$times)
+          
+          out[, approx_times > 0] <- mat[, cols, drop = FALSE]
+        }
+        
+        out
+      }
+      
+      S_all <- predict_sl(S_fit)
+      G_all <- predict_sl(G_fit)
+      
+    } else {
+      
+      S_all <- pec::predictSurvProb(
+        S_fit, newdata = newX, times = approx_times
+      )
+      G_all <- pec::predictSurvProb(
+        G_fit, newdata = newX, times = approx_times
+      )
+      
+    }
+  }
+  
+  expected_dim <- c(nrow(newX), length(approx_times))
   stopifnot(
-    is.numeric(time),
-    all(event %in% c(0L, 1L)),
-    nrow(X) == length(time),
-    nrow(X) == length(event)
+    is.matrix(S_all), identical(dim(S_all), expected_dim),
+    is.matrix(G_all), identical(dim(G_all), expected_dim)
   )
   
-  if (nuisance == "stackG"){
-    
-    # Event model: S(t|X) and censoring model: G(t|X) 
-    # xgboost_grid <- SuperLearner::create.SL.xgboost(
-    #   tune = list(ntrees        = c(250,500,1000),
-    #               max_depth     = c(1,2),
-    #               minobspernode = 10,
-    #               shrinkage     = 0.01))
-    SL.library <- c("SL.mean", "SL.glm", "SL.gam","SL.ranger","SL.xgboost")
-    bin_size <- 0.05
-    surv_out <- survML::stackG(time = time,
-                               event = event,
-                               X = X,
-                               newX = rbind(X_holdout, X),
-                               newtimes = approx_times,
-                               time_grid_approx = approx_times,
-                               bin_size = bin_size,
-                               time_basis = "continuous",
-                               surv_form = "PI",
-                               SL_control = list(SL.library = SL.library,
-                                                 V = 5))
-    
-    # Predictions 
-    S_hat <- surv_out$S_T_preds[1:nrow(X_holdout),]
-    G_hat <- surv_out$S_C_preds[1:nrow(X_holdout),]
-    f_hat <- S_hat[,which(approx_times %in% tau),drop=FALSE]
-    S_hat_train <- surv_out$S_T_preds[(nrow(X_holdout)+1):(nrow(X_holdout)+nrow(X)),]
-    G_hat_train <- surv_out$S_C_preds[(nrow(X_holdout)+1):(nrow(X_holdout)+nrow(X)),]
-    f_hat_train <- S_hat_train[,which(approx_times %in% tau),drop=FALSE]
-  } 
+  i_holdout <- seq_len(nrow(X_holdout))
+  i_train <- nrow(X_holdout) + seq_len(nrow(X))
+  j_tau <- match(tau, approx_times)
   
-  else if (nuisance == "aalen"){
-    
-    # Event model: S(t|X) 
-    S_fit <- timereg::aalen(survival::Surv(time, event) ~ ., data = dat)
-    
-    # Censoring model: G(t|X) 
-    G_fit <- timereg::aalen(survival::Surv(time, 1-event) ~ ., data = dat)
-    
-    # Predictions
-    S_hat       <- pec::predictSurvProb(S_fit, newdata = X_holdout, times = approx_times)
-    G_hat       <- pec::predictSurvProb(G_fit, newdata = X_holdout, times = approx_times)
-    f_hat       <- S_hat[,which(approx_times %in% tau),drop=FALSE]
-    S_hat_train <- pec::predictSurvProb(S_fit, newdata = X,         times = approx_times)
-    G_hat_train <- pec::predictSurvProb(G_fit, newdata = X,         times = approx_times)
-    f_hat_train <- S_hat_train[,which(approx_times %in% tau),drop=FALSE]
+  S_hat <- S_all[i_holdout, , drop = FALSE]
+  G_hat <- G_all[i_holdout, , drop = FALSE]
+  S_hat_train <- S_all[i_train, , drop = FALSE]
+  G_hat_train <- G_all[i_train, , drop = FALSE]
   
-  }
-  
-  else if (nuisance == "cox.aalen"){
-    
-    prop_vars <- x_vars[grepl("Z",x_vars)]
-    add_vars  <- x_vars[grepl("X",x_vars)]
-    
-    rhs <- c(
-      if (length(prop_vars) > 0) paste0("prop(", prop_vars, ")"),
-      add_vars
-    )
-    
-    # Event model: S(t|X) 
-    formS <- as.formula(
-      paste("survival::Surv(time, event) ~", paste(rhs, collapse = " + "))
-    )
-    S_fit <- timereg::cox.aalen(formS, data = dat)
-    
-    # Censoring model: G(t|X) 
-    formG <- as.formula(
-      paste("survival::Surv(time, 1-event) ~", paste(rhs, collapse = " + "))
-    )
-    G_fit       <- timereg::cox.aalen(formG, data = dat)
-    
-    # Predictions
-    S_hat       <- pec::predictSurvProb(S_fit, newdata = X_holdout, times = approx_times)
-    G_hat       <- pec::predictSurvProb(G_fit, newdata = X_holdout, times = approx_times)
-    f_hat       <- S_hat[,which(approx_times %in% tau),drop=FALSE]
-    S_hat_train <- pec::predictSurvProb(S_fit, newdata = X, times = approx_times)
-    G_hat_train <- pec::predictSurvProb(G_fit, newdata = X, times = approx_times)
-    f_hat_train <- S_hat_train[,which(approx_times %in% tau),drop=FALSE]
-
-  }
-  else if (nuisance == "survivalSL"){
-    
-    methods <- c("LIB_COXall", 
-                 "LIB_COXridge",
-                 "LIB_PHexponential",
-                 "LIB_AFTgamma",
-                 "LIB_RSF") 
-    
-    # Event model: S(t | X)
-    formS <- as.formula(
-      paste("Surv(time, event) ~", paste(x_vars, collapse = " + "))
-    )
-    
-    S_fit <- survivalSL::survivalSL(
-      formula       = formS,
-      data          = dat,
-      metric        = "auc",
-      methods       = methods,
-      cv            = 5,
-      show_progress = FALSE
-    )
-    
-    # Censoring model: G(t | X)
-    formG <- as.formula(
-      paste("Surv(time, 1 - event) ~", paste(x_vars, collapse = " + "))
-    )
-    
-    G_fit <- survivalSL::survivalSL(
-      formula       = formG,
-      data          = dat,
-      metric        = "auc",
-      methods       = methods,
-      cv            = 5,
-      show_progress = FALSE
-    )
-    
-    # Predictions
-    S_hat <- survivalSL:::predict.sltime(
-      S_fit,
-      newdata  = X_holdout,
-      newtimes = approx_times
-    )$predictions$sl
-    
-    G_hat <- survivalSL:::predict.sltime(
-      G_fit,
-      newdata  = X_holdout,
-      newtimes = approx_times
-    )$predictions$sl
-    
-    S_hat_train <- survivalSL:::predict.sltime(
-      S_fit,
-      newdata  = X,
-      newtimes = approx_times
-    )$predictions$sl
-    
-    G_hat_train <- survivalSL:::predict.sltime(
-      G_fit,
-      newdata  = X,
-      newtimes = approx_times
-    )$predictions$sl
-  
-    f_hat <- S_hat[, which(approx_times %in% tau), drop = FALSE]
-    f_hat_train <- S_hat_train[, which(approx_times %in% tau), drop = FALSE]
-    
-  }
-  
-  return(list(S_hat = S_hat,
-              G_hat = G_hat,
-              f_hat = f_hat,
-              f_hat_train = f_hat_train,
-              S_hat_train = S_hat_train,
-              G_hat_train = G_hat_train))
+  list(
+    S_hat = S_hat,
+    G_hat = G_hat,
+    f_hat = S_hat[, j_tau, drop = FALSE],
+    f_hat_train = S_hat_train[, j_tau, drop = FALSE],
+    S_hat_train = S_hat_train,
+    G_hat_train = G_hat_train
+  )
 }
 
 
@@ -176,12 +177,12 @@ generate_reduced_predictions <- function(f_hat,
                                          X_reduced,
                                          X_reduced_holdout){
 
-  # xgboost_grid <- SuperLearner::create.SL.xgboost(
-  #   tune = list(ntrees        = c(250,500,1000),
-  #               max_depth     = c(1,2),
-  #               minobspernode = 10,
-  #               shrinkage     = 0.01))
-  SL.library <- c("SL.mean", "SL.glm", "SL.gam","SL.ranger","SL.xgboost")
+  SL.library <- c("SL.mean", 
+                  "SL.glm", 
+                  "SL.gam",
+                  "SL.ranger",
+                  "SL.xgboost")
+  
   long_dat <- data.frame(f_hat = f_hat, X_reduced)
   long_new_dat <- data.frame(X_reduced_holdout)
   reduced_fit <- SuperLearner::SuperLearner(Y = long_dat$f_hat,
@@ -197,13 +198,13 @@ generate_reduced_predictions <- function(f_hat,
   return(list(fs_hat = fs_hat))
 }
 
-CV_generate_full_predictions_landmark <- function(time,
-                                                  event,
-                                                  X,
-                                                  tau,
-                                                  approx_times,
-                                                  nuisance,
-                                                  cf_folds) {
+CV_generate_full_predictions <- function(time,
+                                         event,
+                                         X,
+                                         tau,
+                                         approx_times,
+                                         nuisance,
+                                         cf_folds) {
   
   X <- as.data.frame(X)
   event <- as.integer(event)
@@ -238,13 +239,13 @@ CV_generate_full_predictions_landmark <- function(time,
   purrr::transpose(res)
 }
 
-CV_generate_reduced_predictions_landmark <- function(time,
-                                                     event,
-                                                     X,
-                                                     tau,
-                                                     cf_folds,
-                                                     indx,
-                                                     full_preds_train) {
+CV_generate_reduced_predictions <- function(time,
+                                            event,
+                                            X,
+                                            tau,
+                                            cf_folds,
+                                            indx,
+                                            full_preds_train) {
   
   V <- length(unique(cf_folds))
   
@@ -270,4 +271,3 @@ CV_generate_reduced_predictions_landmark <- function(time,
     }) %>% as.matrix()
   })
 }
-

@@ -58,6 +58,7 @@ generate_full_predictions <- function(time,
       
     } else if (nuisance == "cox.aalen") {
       
+      x_vars <- names(X)
       prop_vars <- x_vars[grepl("Z",x_vars)]
       add_vars  <- x_vars[grepl("X",x_vars)]
       

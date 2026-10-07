@@ -83,7 +83,7 @@ generate_full_predictions <- function(time,
       )
       
       # Event model: S(t | X)
-      S_fit <- timereg::cox.aalen(form, data = datG)
+      S_fit <- timereg::cox.aalen(form, data = datS)
       
       # Censoring model: G(t | X)
       # G_fit <- timereg::cox.aalen(form, data = datG)

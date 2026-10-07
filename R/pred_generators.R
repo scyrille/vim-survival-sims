@@ -1,3 +1,9 @@
+
+library(tidyr)
+library(purrr)
+library(survML)
+library(survivalSL)
+
 generate_full_predictions <- function(time, 
                                       event, 
                                       X, 
@@ -52,8 +58,11 @@ generate_full_predictions <- function(time,
       S_fit <- timereg::aalen(
         survival::Surv(time, event) ~ ., data = datS
       )
-      G_fit <- timereg::aalen(
-        survival::Surv(time, event) ~ ., data = datG
+      # G_fit <- timereg::aalen(
+      #   survival::Surv(time, event) ~ ., data = datG
+      # )
+      G_fit <- survival::survfit(
+        survival::Surv(time, event) ~ 1, data = datG
       )
       
     } else if (nuisance == "cox.aalen") {
@@ -77,7 +86,10 @@ generate_full_predictions <- function(time,
       S_fit <- timereg::cox.aalen(form, data = datG)
       
       # Censoring model: G(t | X)
-      G_fit <- timereg::cox.aalen(form, data = datG)
+      # G_fit <- timereg::cox.aalen(form, data = datG)
+      G_fit <- survival::survfit(
+        survival::Surv(time, event) ~ 1, data = datG
+      )
       
     } else if (nuisance == "survivalSL") {  
       
@@ -141,10 +153,23 @@ generate_full_predictions <- function(time,
       S_all <- pec::predictSurvProb(
         S_fit, newdata = newX, times = approx_times
       )
-      G_all <- pec::predictSurvProb(
-        G_fit, newdata = newX, times = approx_times
+      # G_all <- pec::predictSurvProb(
+      #   G_fit, newdata = newX, times = approx_times
+      # )
+      G_summary <- summary(
+        G_fit,
+        times = sort(unique(approx_times)),
+        extend = TRUE
       )
       
+      # Restaurer l'ordre initial des temps, y compris les doublons
+      G_t <- G_summary$surv[match(approx_times, G_summary$time)]
+      G_all <- matrix(
+        G_t,
+        nrow = nrow(newX),
+        ncol = length(approx_times),
+        byrow = TRUE
+      )
     }
   }
   
@@ -236,7 +261,7 @@ CV_generate_full_predictions <- function(time,
       CV_G_preds_train = full_preds$G_hat_train
     )
   })
-  
+
   purrr::transpose(res)
 }
 

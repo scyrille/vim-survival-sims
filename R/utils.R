@@ -373,9 +373,9 @@ tbl_data <- function(output, scenario){
     }
       
     list(tbl_add = ft_tbl_add_var %>%
-           flextable::width(width = c(3, rep(0.7, n_add))),
+           flextable::width(width = c(4.5, rep(0.7, n_add))),
          tbl_prop = ft_tbl_prop_var %>%
-           flextable::width(width = c(3, rep(0.7, n_prop)))
+           flextable::width(width = c(4.5, rep(0.7, n_prop)))
     )
   }
 }
@@ -395,11 +395,13 @@ tbl_vim <- function(output){
   
   reduced_models <- output %>%
     transmute(
-      model = paste0(
-        "Without $X_{",
-        stringr::str_remove(variable, "^X"),
-        "}$"
-      ),
+      model = 
+        case_when(
+          startsWith(variable, "X") ~
+            paste0("Without $X_{", stringr::str_remove(variable, "^X"), "}$"),
+          startsWith(variable, "Z") ~
+            paste0("Without $Z_{", stringr::str_remove(variable, "^Z"), "}$")
+          ),
       vim,
       performance = small_predictiveness,
       importance = est,
@@ -470,3 +472,122 @@ tbl_vim <- function(output){
     )%>%
     flextable::width(width = c(2, rep(1.1, 4)))
 }
+
+plot_perf <- function(sims_perf){
+  
+  point_size <- 1
+  axis_text_size <- 12
+  legend_text_size_small_plot <- 13
+  
+  sims_perf <- sims_perf %>%
+    dplyr::mutate(
+      nuisance = factor(nuisance, 
+                        levels = c("aalen",
+                                   "cox.aalen",
+                                   "stackG",
+                                   "survivalSL"),
+                        labels = c("Aalen",
+                                   "Cox-Aalen",
+                                   "Global survival stacking",
+                                   "Survival Super Learner")))
+  theme_plot <- 
+    theme_bw() +
+    theme(
+      plot.title = element_text(hjust = 0.5),
+      panel.grid.minor.x = element_blank(),
+      panel.grid.major.x = element_blank(),
+      panel.grid.major.y = element_line(color = "grey100"),
+      panel.grid.minor.y = element_blank(),
+      legend.position = "none",
+      axis.text.y = element_text(size = axis_text_size),
+      # axis.text.x = element_blank(),
+      # axis.title.x = element_blank(),
+      plot.margin = unit(c(0.1, 0.3, 0.1, 0), "cm")
+    )
+  
+  
+  # Bias
+  bias_plot <- sims_perf %>% 
+    ggplot(aes(x = variable, y = bias, color = nuisance)) +
+    geom_hline(yintercept = 0, linetype = "solid", color = "gray30") +
+    geom_point(size = point_size, position = position_dodge(width = 0.6)) +
+    geom_errorbar(aes(ymin=bias-1.96*bias_mc_se, ymax=bias + 1.96*bias_mc_se), 
+                  width=.1, position = position_dodge(width = 0.6)) +
+    facet_wrap(~ vim, labeller = label_parsed, strip.position = "top") +
+    labs(x = "Variable", y = "Empirical bias", color = "Nuisance")+
+    theme_plot
+  
+  # Coverage
+  cover_plot <- sims_perf %>% 
+    ggplot(aes(x = variable, y = coverage, color = nuisance)) +
+    geom_hline(yintercept = 0.95, linetype = "solid", color = "gray30") +
+    geom_point(size = point_size, position = position_dodge(width = 0.6)) +
+    geom_errorbar(aes(ymin=ifelse(coverage-1.96*cov_mc_se <0, 0, coverage-1.96*cov_mc_se),
+                      ymax=ifelse(coverage+1.96*cov_mc_se >1, 1, coverage+1.96*cov_mc_se)),
+                  width=.1, position = position_dodge(width = 0.6))+
+    facet_wrap(~ vim, labeller = label_parsed, strip.position = "top") +
+    labs(x = "Variable", y = "Empirical coverage", color = "Nuisance")+
+    theme_plot
+  
+  # Variance 
+  var_plot <- sims_perf %>% 
+    ggplot(aes(x = variable, y = variance, color = nuisance)) +
+    geom_point(size = point_size, position = position_dodge(width = 0.6)) +
+    geom_errorbar(aes(ymin=variance - 1.96*var_mc_se,
+                      ymax=variance + 1.96*var_mc_se),
+                  width=.1, position = position_dodge(width = 0.6)) +
+    facet_wrap(~ vim, labeller = label_parsed, strip.position = "top") +
+    labs(x = "Variable", y = "Empirical variance", color = "Nuisance")+
+    theme_plot
+  
+  # CI width
+  width_plot <- sims_perf %>% 
+    ggplot(aes(x = variable, y = ci_width, color = nuisance)) +
+    geom_point(size = point_size, position = position_dodge(width = 0.6)) +
+    geom_errorbar(aes(ymin = ci_width - 1.96*width_mc_se,
+                      ymax = ci_width + 1.96*width_mc_se),
+                  width=.1, position = position_dodge(width = 0.6)) +
+    facet_wrap(~ vim, labeller = label_parsed, strip.position = "top") +
+    labs(x = "Variable", y = "Empirical confidence interval width", color = "Nuisance")+
+    theme_plot
+  
+  # Power 
+  power_plot <- sims_perf %>% 
+    ggplot(aes(x = variable, y = power, color = nuisance)) +
+    geom_point(size = point_size, position = position_dodge(width = 0.6)) +
+    geom_errorbar(aes(ymin=ifelse(power-1.96*power_mc_se <0, 0, power-1.96*power_mc_se),
+                      ymax=ifelse(power+1.96*power_mc_se >1, 1, power+1.96*power_mc_se)),
+                  width=.1, position = position_dodge(width = 0.6)) +
+    geom_hline(yintercept = 1, linetype = "solid", color = "gray30") +
+    facet_wrap(~ vim, labeller = label_parsed, strip.position = "top") +
+    labs(x = "Variable", y = "Empirical power", color = "Nuisance")+
+    theme_plot
+  
+  legend_j <- get_legend(
+    bias_plot +
+      guides(color = guide_legend(nrow = 1, ncol = 3)) +
+      theme(legend.direction = "horizontal",
+            legend.position = "bottom",
+            legend.title = element_text(size = legend_text_size_small_plot),
+            legend.text = element_text(size = legend_text_size_small_plot))
+  )
+  
+  panel_plots <- cowplot::plot_grid(
+    bias_plot, 
+    var_plot, 
+    cover_plot, 
+    width_plot,
+    power_plot,
+    nrow = 3, 
+    ncol = 2
+  )
+  
+  cowplot::plot_grid(
+    legend_j, 
+    panel_plots, 
+    ncol = 1, 
+    nrow = 2,
+    rel_heights = c(.075, 1)
+  )
+}
+

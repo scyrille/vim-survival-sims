@@ -22,9 +22,9 @@ do_one <- function(n, scenario, c_max, tau, nuisances, scale_est = FALSE){
   sample_split <- TRUE
   V <- 5 
   
-  time <- data$time
-  event <- data$event
-  X <- data %>% dplyr::select(-c(time,event))
+  time <- data$y
+  event <- data$delta
+  X <- data %>% dplyr::select(starts_with(c("X","Z")))
   indxs <- paste0(1:ncol(X))
   
   approx_times <- sort(unique(c(0, time[event == 1], tau)))

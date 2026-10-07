@@ -3,6 +3,8 @@
 #  True VIM values  #
 #-------------------#
 
+# Approximating the population performance of the oracle prediction functions
+
 library(here)
 library(tidyverse)
 library(MASS)
@@ -31,7 +33,7 @@ data_1 <- generate_data(n = n, scenario = "1",
 ## True VIM values 
 true_param_1 <- purrr::map_dfr(calibration_param$params_1$tau, function(t) {
   
-  y <- as.integer(data_1$time > t)
+  y <- as.integer(data_1$t > t)
   xvars <- names(dplyr::select(data_1, starts_with("X")))
   
   # Full model
@@ -100,7 +102,7 @@ data_2 <- generate_data(n = n, scenario = "2",
 ## True VIM values
 true_param_2 <- purrr::map_dfr(calibration_param$params_2$tau, function(t) {
   
-  y <- as.integer(data_2$time > t)
+  y <- as.integer(data_2$t > t)
   
   add_vars  <- names(dplyr::select(data_2, starts_with("X")))
   mult_vars <- names(dplyr::select(data_2, starts_with("Z")))

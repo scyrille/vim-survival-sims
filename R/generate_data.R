@@ -104,10 +104,14 @@ generate_data <- function(n, scenario, c_max){
     C <- runif(n, min = 0, max = c_max)
     
     # --------- Observed data --------- #
-    time <- pmin(T, C)
-    event <- as.integer(T <= C)
+    y <- pmin(T, C)
+    delta <- as.integer(T <= C)
     
-    data <- data.frame(time = time, event = event, X, 
+    data <- data.frame(X, 
+                       y = y, 
+                       delta = delta, 
+                       t = T, 
+                       c = C, 
                        check.names = FALSE)
   
   } else if (scenario == "2"){
@@ -163,10 +167,15 @@ generate_data <- function(n, scenario, c_max){
     C <- runif(n, min = 0, max = c_max)
     
     # --------- Observed data --------- #
-    time <- pmin(T, C)
-    event <- as.integer(T <= C)
+    y <- pmin(T, C)
+    delta <- as.integer(T <= C)
     
-    data <- data.frame(time = time, event = event, X_add, X_mult, 
+    data <- data.frame(X_add, 
+                       X_mult, 
+                       y = y, 
+                       delta = delta, 
+                       t = T, 
+                       c = C, 
                        check.names = FALSE)
     
   }

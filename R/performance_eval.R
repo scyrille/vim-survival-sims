@@ -3,9 +3,7 @@ library(dplyr)
 library(ggplot2)
 library(cowplot)
 
-simulation_metrics <- function(output){
-  
-  truth_param <- readRDS(here::here("outputs","results","mc_truth_param.RDS"))
+simulation_metrics <- function(output, truth_param){
   
   scenario <- output %>%
     dplyr::select(scenario)%>%

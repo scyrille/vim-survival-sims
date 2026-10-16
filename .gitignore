@@ -18,6 +18,7 @@ outputs/
 
 report_sources/
 help/
+docs/
 
 # ======================
 # Tests

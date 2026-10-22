@@ -1,7 +1,10 @@
 
 get_scenario_param <- function(scenario){
   
-  if (scenario == "S1_base"){
+  # Baseline scenarios
+  
+  # S1_base: Additive model — baseline scenario
+  if (scenario == "S1_base"){ 
     
     p           = 5
     lambda0     = 0.05 
@@ -23,6 +26,7 @@ get_scenario_param <- function(scenario){
     
     list2env(params, .GlobalEnv)
     
+    # S2_base: Additive-multiplicative model — baseline scenario
   } else if (scenario == "S2_base"){
     
     p <- 6
@@ -55,6 +59,7 @@ get_scenario_param <- function(scenario){
     
     list2env(params, .GlobalEnv)
     
+  # S1_prev: Additive model — varying prevalence
   } else if (scenario == "S1_prev"){
     
     p           = 6
@@ -77,6 +82,7 @@ get_scenario_param <- function(scenario){
     
     list2env(params, .GlobalEnv)
     
+    # S2_prev: Additive-multiplicative model — varying prevalence
   } else if (scenario == "S2_prev") {
     
     p_add <- 6
@@ -292,6 +298,15 @@ generate_data <- function(n, scenario, c_max){
 
 calibrate_parameters <- function(n, scenario, max_upper, probs){
   
+  # ------ Expected censoring proportion under C ~ Uniform(0, cmax) ----- #
+  cens_rate_det_S1 <- function(cmax, T) {
+    mean(pmin(1, T / cmax))
+  }
+  
+  cens_rate_det_S2 <- function(cmax, T) {
+    mean(pmin(1, T / cmax))
+  }
+  
   if (scenario %in% c("S1_base","S1_prev")){
     
     get_scenario_param(scenario) 
@@ -321,12 +336,7 @@ calibrate_parameters <- function(n, scenario, max_upper, probs){
     haz <- as.numeric(lambda0 + X %*% alpha)
     T <- rexp(n, rate = haz)
     
-    # ------ Expected censoring proportion under C ~ Uniform(0, cmax) ----- #
-    cens_rate_det_1 <- function(cmax) {
-      mean(pmin(1, T / cmax))
-    }
-    
-    f <- function(cmax) cens_rate_det_1(cmax) - target_cens
+    f <- function(cmax) cens_rate_det_S1(cmax, T) - target_cens
     
     lower <- 1e-8
     upper <- 1
@@ -418,12 +428,7 @@ calibrate_parameters <- function(n, scenario, max_upper, probs){
     haz <- pmax(haz_add, 0) * exp(as.numeric(X_mult %*% beta))
     T <- rexp(n, rate = haz)
     
-    # ---------- Expected censoring under C ~ Uniform(0, c_max) ---------- #
-    cens_rate_det_2 <- function(cmax) {
-      mean(pmin(1, T / cmax))
-    }
-    
-    f <- function(cmax) cens_rate_det_2(cmax) - target_cens
+    f <- function(cmax) cens_rate_det_S2(cmax, T) - target_cens
     
     lower <- 1e-8
     upper <- 1
@@ -501,7 +506,7 @@ calibrate_parameters <- function(n, scenario, max_upper, probs){
     
     # ---------- Expected censoring under C ~ Uniform(0, c_max) ---------- #
     
-    f <- function(cmax) cens_rate_det_2(cmax) - target_cens
+    f <- function(cmax) cens_rate_det_S2(cmax, T) - target_cens
     
     lower <- 1e-8
     upper <- 1

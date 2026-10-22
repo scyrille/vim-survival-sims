@@ -1,5 +1,6 @@
 # ---------------------------------------------------- #
-#                 S1_base simulations                 #
+#                 S1_base simulations                  #
+#          Additive model — baseline scenario          # 
 # ---------------------------------------------------- #
 
 # Run this script in the project containing the functions in R/.

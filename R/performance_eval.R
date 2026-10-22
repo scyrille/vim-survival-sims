@@ -10,8 +10,6 @@ simulation_metrics <- function(output, truth_param){
     dplyr::distinct()
  
   perf <- output %>%
-    # map(~ .x %>% bind_rows())%>%
-    # bind_rows()%>%
     left_join(truth_param %>% dplyr::filter(scenario == scenario), 
               by = c("scenario","vim","variable","tau"))%>%
     dplyr::mutate(err = est - true_vim,

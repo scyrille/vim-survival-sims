@@ -4,20 +4,9 @@ do_one <- function(n, scenario, c_max, tau, nuisances, scale_est = FALSE){
   start <- Sys.time()
   
   vims <- c("BS(t)","AUC(t)")
-  
-  message("Generating data...")
-  
-  if (scenario == 1){
-    
-    get_scenario_param("1")
-    data <- generate_data(n = n, scenario = "1", c_max = c_max)
-    
-  } else if (scenario == "2"){
-    
-    get_scenario_param("2")
-    data <- generate_data(n = n, scenario = "2", c_max = c_max)
-    
-  }
+
+  get_scenario_param(scenario)
+  data <- generate_data(n = n, scenario = scenario, c_max = c_max)
   
   sample_split <- TRUE
   V <- 5 

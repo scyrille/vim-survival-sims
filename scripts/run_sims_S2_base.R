@@ -92,32 +92,17 @@ true_param_S2_base <- purrr::map_dfr(tau, function(t) {
   
   reduced_res <- purrr::map_dfr(all_vars, function(vj) {
     
-    is_add  <- vj %in% add_vars
-    is_mult <- vj %in% mult_vars
-    
-    add_vars_red  <- setdiff(add_vars, vj)
-    mult_vars_red <- setdiff(mult_vars, vj)
-    
-    alpha_red <- if (is_add) {
-      alpha[add_vars != vj]
-    } else {
-      alpha
-    }
-    
-    beta_red <- if (is_mult) {
-      beta[mult_vars != vj]
-    } else {
-      beta
-    }
-    
-    f_red <- true_S0_cox_aalen(
+    f_red <- true_S0_reduced_cox_aalen(
       t         = t,
-      data      = dplyr::select(data_S2_base, -dplyr::all_of(vj)),
+      data      = data_S2_base,
       lambda0   = lambda0,
-      alpha     = alpha_red,
-      beta      = beta_red,
-      add_vars  = add_vars_red,
-      mult_vars = mult_vars_red
+      alpha     = alpha,
+      beta      = beta,
+      add_vars  = add_vars,
+      mult_vars = mult_vars,
+      variable  = vj,
+      prev_add  = prev_add,
+      prev_mult = prev_mult
     )
     
     tibble::tibble(

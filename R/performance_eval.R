@@ -1,8 +1,4 @@
 
-library(dplyr)
-library(ggplot2)
-library(cowplot)
-
 simulation_metrics <- function(output, truth_param){
   
   scenario <- output %>%

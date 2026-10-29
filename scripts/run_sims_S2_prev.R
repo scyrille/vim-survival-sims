@@ -73,38 +73,42 @@ true_param_S2_prev <- purrr::map_dfr(tau, function(t) {
   
   y <- as.integer(data_S2_prev$t > t)
   
-  xvars <- names(
-    dplyr::select(data_S2_prev, dplyr::starts_with("X"))
-  )
+  add_vars <- names(dplyr::select(data_S2_prev, dplyr::starts_with("X")))
+  mult_vars <- names(dplyr::select(data_S2_prev, dplyr::starts_with("Z")))
+  all_vars <- c(add_vars, mult_vars)
   
-  # Full model
-  f_full <- true_S0_aalen(
-    t = t,
-    data = data_S2_prev,
-    lambda0 = lambda0,
-    alpha = alpha
+  # Full additive-multiplicative oracle
+  f_full <- true_S0_cox_aalen(
+    t         = t,
+    data      = data_S2_prev,
+    lambda0   = lambda0,
+    alpha     = alpha,
+    beta      = beta,
+    add_vars  = add_vars,
+    mult_vars = mult_vars
   )
   
   V_full_brier <- -vimp::measure_mse(f_full, y)$point_est
   V_full_auc <- cvAUC::AUC(f_full, y)
   
-  # Reduced models
-  reduced_res <- purrr::map_dfr(seq_along(xvars), function(j) {
+  # Reduced oracles: average over the omitted independent binary covariate.
+  reduced_res <- purrr::map_dfr(all_vars, function(vj) {
     
-    xj <- xvars[j]
-    
-    f_red <- true_S0_aalen(
-      t = t,
-      data = dplyr::select(
-        data_S2_prev,
-        -dplyr::all_of(xj)
-      ),
-      lambda0 = lambda0,
-      alpha = alpha[-j]
+    f_red <- true_S0_reduced_cox_aalen(
+      t         = t,
+      data      = data_S2_prev,
+      lambda0   = lambda0,
+      alpha     = alpha,
+      beta      = beta,
+      add_vars  = add_vars,
+      mult_vars = mult_vars,
+      variable  = vj,
+      prev_add  = prev_add,
+      prev_mult = prev_mult
     )
     
     tibble::tibble(
-      variable = xj,
+      variable = vj,
       V_brier = -vimp::measure_mse(f_red, y)$point_est,
       V_auc = cvAUC::AUC(f_red, y)
     )

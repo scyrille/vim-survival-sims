@@ -14,9 +14,9 @@ compute_vim <- function(time,
   
   vims <- c("BS(t)","AUC(t)")
   
-  message(paste0("Estimating conditional survival functions by ",
-                 nuisance, 
-                 "..."))
+  # message(paste0("Estimating conditional survival functions by ",
+  #                nuisance, 
+  #                "..."))
   
   V0_preds <- CV_generate_full_predictions(
     time = time,
@@ -41,11 +41,11 @@ compute_vim <- function(time,
     
     variable <- paste(names(X)[indx], collapse = ", ")
     
-    message(paste0("Estimating the importance of ",
-                   variable,
-                   " with nuisance functions estimated by ",
-                   nuisance, 
-                   "..."))
+    # message(paste0("Estimating the importance of ",
+    #                variable,
+    #                " with nuisance functions estimated by ",
+    #                nuisance, 
+    #                "..."))
     
     CV_reduced_preds <- CV_generate_reduced_predictions(
       time = time,

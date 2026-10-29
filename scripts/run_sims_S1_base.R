@@ -14,7 +14,7 @@
 packages <- c(
   "here", "tidyverse", "MASS", "cvAUC", "vimp", "survML",
   "SuperLearner", "ranger", "xgboost", "timereg",
-  "survivalSL", "parallel"
+  "survivalSL", "parallel","cowplot"
 )
 
 invisible(lapply(packages, library, character.only = TRUE))
@@ -103,6 +103,11 @@ true_param_S1_base <- purrr::map_dfr(tau, function(t) {
       alpha = alpha[-j]
     )
     
+    # Average over the omitted covariate
+    f_red <- f_red * (
+      (1 - prev[j]) + prev[j] * exp(-t * alpha[j])
+    )
+    
     tibble::tibble(
       variable = xj,
       V_brier = -vimp::measure_mse(f_red, y)$point_est,
@@ -183,7 +188,7 @@ RNGkind("L'Ecuyer-CMRG")
 set.seed(2026)
 param_grid$seed <- sample.int(1e9, nrow(param_grid))
 
-workers <- 8L
+workers <- parallelly::availableCores(omit = 4L)
 
 # Compute and save one replication 
 

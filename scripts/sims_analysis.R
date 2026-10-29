@@ -5,7 +5,7 @@
 
 # Packages and project functions -----------------------------------------
 
-packages <- c("here", "purrr", "ggplot2")
+packages <- c("here", "purrr", "ggplot2","cowplot")
 
 invisible(lapply(packages, library, character.only = TRUE))
 

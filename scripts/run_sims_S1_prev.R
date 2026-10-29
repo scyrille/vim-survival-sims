@@ -103,6 +103,11 @@ true_param_S1_prev <- purrr::map_dfr(tau, function(t) {
       alpha = alpha[-j]
     )
     
+    # Average over the omitted covariate
+    f_red <- f_red * (
+      (1 - prev[j]) + prev[j] * exp(-t * alpha[j])
+    )
+    
     tibble::tibble(
       variable = xj,
       V_brier = -vimp::measure_mse(f_red, y)$point_est,

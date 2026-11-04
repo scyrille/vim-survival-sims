@@ -188,7 +188,7 @@ RNGkind("L'Ecuyer-CMRG")
 set.seed(2026)
 param_grid$seed <- sample.int(1e9, nrow(param_grid))
 
-workers <- parallelly::availableCores(omit = 4L)
+workers <- 8L
 
 # Compute and save one replication 
 

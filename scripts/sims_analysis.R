@@ -54,3 +54,38 @@ perf_sims_n1000_S1_base <- simulation_metrics(
 plot_perf(perf_sims_n1000_S1_base)%>%
   ggsave(filename = file.path(fig_dir, "perf_sims_n1000_S1_base.png"),
          width = 13, height = 8, dpi = 600, units = "in", bg = "white")
+
+# S2_base -----------------------------------------------------------------
+
+# True VIM values
+true_param_S2_base <- readRDS(here::here(res_dir, "S2_base/mc_truth_param_S2_base.rds"))
+
+# n = 500
+sims_n500_S2_base <- list.files(
+  path = here::here(res_dir, "S2_base/n500_seed837949287"), 
+  full.names = T)%>%
+  purrr::map(~readRDS(.x))%>%
+  bind_rows()
+
+perf_sims_n500_S2_base <- simulation_metrics(
+  truth_param = true_param_S2_base,
+  output      = sims_n500_S2_base)
+
+plot_perf(perf_sims_n500_S2_base)%>%
+  ggsave(filename = file.path(fig_dir, "perf_sims_n500_S2_base.png"),
+         width = 13, height = 8, dpi = 600, units = "in", bg = "white")
+
+# n = 1000 
+sims_n1000_S2_base <- list.files(
+  path = here::here(res_dir, "S2_base/n1000_seed837949287"),
+  full.names = T)%>%
+  purrr::map(~readRDS(.x))%>%
+  bind_rows()
+
+perf_sims_n1000_S2_base <- simulation_metrics(
+  truth_param = true_param_S2_base,
+  output      = sims_n1000_S2_base)
+
+plot_perf(perf_sims_n1000_S2_base)%>%
+  ggsave(filename = file.path(fig_dir, "perf_sims_n1000_S2_base.png"),
+         width = 13, height = 8, dpi = 600, units = "in", bg = "white")
